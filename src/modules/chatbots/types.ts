@@ -130,6 +130,7 @@ export interface FlowData {
     zoom?: number;
     viewport?: { x: number; y: number; zoom: number };
     updatedAt?: string;
+    [key: string]: any;
   };
 }
 

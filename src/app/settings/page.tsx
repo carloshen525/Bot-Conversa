@@ -15,6 +15,7 @@ import {
   ArrowRight,
   ChevronRight,
   Globe,
+  Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -221,6 +222,40 @@ export default function SettingsPage() {
             </div>
           )}
         </CardContent>
+      </Card>
+
+      {/* Execution Engine Delay Resume */}
+      <Card className="bg-[#11131a] border-border/70">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Zap className="h-4 w-4 text-amber-400" />
+              <CardTitle>Motor de Execução: Pausas Temporais (Cron / Worker)</CardTitle>
+            </div>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={async () => {
+                try {
+                  const res = await fetch("/api/execution/resume", { method: "POST" });
+                  const json = await res.json();
+                  if (json.success) {
+                    success("Pausas Verificadas", `${json.resumedCount} fluxo(s) retomados.`);
+                  }
+                } catch (e: any) {
+                  error("Erro", e.message);
+                }
+              }}
+              className="border-amber-500/30 text-amber-300 hover:bg-amber-500/10 text-xs"
+            >
+              <Zap className="h-3.5 w-3.5" />
+              <span>Processar Esperas Vencidas</span>
+            </Button>
+          </div>
+          <CardDescription>
+            Conversas pausadas em nós do tipo Espera (minutos, horas, dias) aguardam o horário programado. Em produção, configure um cronjob chamando <code>POST /api/execution/resume</code> a cada minuto.
+          </CardDescription>
+        </CardHeader>
       </Card>
 
       {/* Supabase Schema Reference */}

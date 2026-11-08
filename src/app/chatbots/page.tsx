@@ -15,6 +15,7 @@ import {
   Clock,
   Layers,
   ArrowUpRight,
+  History,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +26,7 @@ import { Loading } from "@/components/ui/loading";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useToast } from "@/components/ui/toast";
 import { formatDate, formatRelativeTime } from "@/modules/shared/utils";
+import { VersionHistoryModal } from "@/modules/chatbots/editor/VersionHistoryModal";
 
 interface ChatbotItem {
   id: string;
@@ -59,6 +61,9 @@ export default function ChatbotsPage() {
 
   // Publishing
   const [isPublishingId, setIsPublishingId] = useState<string | null>(null);
+
+  // Version History Modal
+  const [historyTarget, setHistoryTarget] = useState<ChatbotItem | null>(null);
 
   const fetchChatbots = async () => {
     try {
@@ -320,6 +325,17 @@ export default function ChatbotsPage() {
                             <span className="hidden sm:inline">Publicar</span>
                           </Button>
 
+                          {/* Version history / rollback */}
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setHistoryTarget(bot)}
+                            title="Histórico de versões e rollback"
+                            className="h-8 w-8 p-0 hover:text-indigo-400"
+                          >
+                            <History className="h-3.5 w-3.5 text-muted-foreground" />
+                          </Button>
+
                           {/* Duplicate */}
                           <Button
                             size="sm"
@@ -404,6 +420,19 @@ export default function ChatbotsPage() {
         isDestructive
         isLoading={isDeleting}
       />
+
+      {/* Modal: Version History & Rollback */}
+      {historyTarget && (
+        <VersionHistoryModal
+          isOpen={!!historyTarget}
+          onClose={() => setHistoryTarget(null)}
+          chatbotId={historyTarget.id}
+          currentPublishedVersionId={historyTarget.current_published_version_id}
+          onRollbackComplete={() => {
+            fetchChatbots();
+          }}
+        />
+      )}
     </div>
   );
 }

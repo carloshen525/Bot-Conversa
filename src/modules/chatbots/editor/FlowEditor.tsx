@@ -23,6 +23,7 @@ import { NodeSidebar } from "./NodeSidebar";
 import { PropertiesPanel } from "./PropertiesPanel";
 import { Toolbar } from "./Toolbar";
 import { SimulatorModal } from "./SimulatorModal";
+import { VersionHistoryModal } from "./VersionHistoryModal";
 import { FlowData, FlowNode, FlowEdge } from "../types";
 import { useToast } from "@/components/ui/toast";
 import { generateId } from "@/modules/shared/utils";
@@ -55,6 +56,7 @@ function FlowEditorInner({
   // UI state
   const [isMiniMapOpen, setIsMiniMapOpen] = useState(false);
   const [isSimulatorOpen, setIsSimulatorOpen] = useState(false);
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
 
@@ -344,6 +346,61 @@ function FlowEditorInner({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [copiedNodes, edges, handleRedo, handleUndo, info, nodes, pushHistory, setNodes]);
 
+  const handleExportJson = useCallback(() => {
+    const dataToExport: FlowData = {
+      nodes,
+      edges,
+      settings: initialFlowData.settings || {},
+      triggers: initialFlowData.triggers || [],
+      metadata: {
+        exportedAt: new Date().toISOString(),
+        chatbotName,
+        chatbotId,
+      },
+    };
+    const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(
+      JSON.stringify(dataToExport, null, 2)
+    )}`;
+    const downloadAnchor = document.createElement("a");
+    downloadAnchor.setAttribute("href", jsonString);
+    downloadAnchor.setAttribute(
+      "download",
+      `${chatbotName.toLowerCase().replace(/[^a-z0-9]/g, "-")}-flow.json`
+    );
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+    success("Fluxo Exportado", "O arquivo JSON do fluxo foi baixado com sucesso.");
+  }, [nodes, edges, initialFlowData, chatbotName, chatbotId, success]);
+
+  const handleImportJson = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const content = e.target?.result as string;
+          const parsed = JSON.parse(content);
+          if (!parsed.nodes || !Array.isArray(parsed.nodes)) {
+            throw new Error("Formato inválido: o arquivo deve conter a lista 'nodes'.");
+          }
+          setNodes(parsed.nodes);
+          setEdges(parsed.edges || []);
+          pushHistory(parsed.nodes, parsed.edges || []);
+          success("Fluxo Importado", `${parsed.nodes.length} blocos carregados.`);
+        } catch (err: any) {
+          error("Erro na Importação", err.message || "Não foi possível ler o arquivo JSON.");
+        } finally {
+          event.target.value = "";
+        }
+      };
+      reader.readAsText(file);
+    },
+    [setNodes, setEdges, pushHistory, success, error]
+  );
+
   const currentFlowData: FlowData = {
     nodes,
     edges,
@@ -371,6 +428,9 @@ function FlowEditorInner({
         onFitView={() => rfInstance?.fitView({ padding: 0.2 })}
         onToggleMiniMap={() => setIsMiniMapOpen(!isMiniMapOpen)}
         onOpenSimulator={() => setIsSimulatorOpen(true)}
+        onOpenHistory={() => setIsHistoryModalOpen(true)}
+        onExportJson={handleExportJson}
+        onImportJson={handleImportJson}
       />
 
       {/* Main Workspace: Left Sidebar + Central React Flow Canvas + Right Properties Panel */}
@@ -432,6 +492,16 @@ function FlowEditorInner({
         isOpen={isSimulatorOpen}
         onClose={() => setIsSimulatorOpen(false)}
         flowData={currentFlowData}
+      />
+
+      {/* Version History & Rollback Modal */}
+      <VersionHistoryModal
+        isOpen={isHistoryModalOpen}
+        onClose={() => setIsHistoryModalOpen(false)}
+        chatbotId={chatbotId}
+        onRollbackComplete={() => {
+          window.location.reload();
+        }}
       />
     </div>
   );
