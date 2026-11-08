@@ -1,4 +1,4 @@
-import { InstanceInfo } from "../evolution/provider.interface";
+import { InstanceInfo } from "../../evolution/provider.interface";
 import { generateId } from "../../shared/utils";
 
 export interface ChannelConfig {
