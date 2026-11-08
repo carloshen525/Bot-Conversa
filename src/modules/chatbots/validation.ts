@@ -8,7 +8,7 @@ export const chatbotCreateSchema = z.object({
 export const chatbotUpdateSchema = z.object({
   name: z.string().min(2, "O nome deve ter pelo menos 2 caracteres").optional(),
   description: z.string().optional(),
-  status: z.enum(["draft", "published", "archived"]).optional(),
+  status: z.enum(["draft", "published", "archived", "paused"]).optional(),
 });
 
 export const conditionBranchSchema = z.object({

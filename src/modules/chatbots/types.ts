@@ -138,7 +138,7 @@ export interface Chatbot {
   id: string;
   name: string;
   description: string;
-  status: "draft" | "published" | "archived";
+  status: "draft" | "published" | "archived" | "paused";
   current_published_version_id?: string | null;
   created_at: string;
   updated_at: string;

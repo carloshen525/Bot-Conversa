@@ -14,6 +14,8 @@ import {
   History,
   Download,
   Upload,
+  Pause,
+  Play,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -37,6 +39,8 @@ interface ToolbarProps {
   onOpenHistory?: () => void;
   onExportJson?: () => void;
   onImportJson?: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  isPausing?: boolean;
+  onTogglePause?: () => void;
 }
 
 export function Toolbar({
@@ -59,6 +63,8 @@ export function Toolbar({
   onOpenHistory,
   onExportJson,
   onImportJson,
+  isPausing,
+  onTogglePause,
 }: ToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -92,10 +98,16 @@ export function Toolbar({
               className={`rounded-full px-2 py-0.5 text-[10px] font-medium border ${
                 chatbotStatus === "published"
                   ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
-                  : "bg-amber-500/10 text-amber-400 border-amber-500/30"
+                  : chatbotStatus === "paused"
+                  ? "bg-amber-500/10 text-amber-400 border-amber-500/30"
+                  : "bg-slate-500/10 text-slate-400 border-slate-500/30"
               }`}
             >
-              {chatbotStatus === "published" ? "Publicado" : "Rascunho"}
+              {chatbotStatus === "published"
+                ? "Ativo / Publicado"
+                : chatbotStatus === "paused"
+                ? "Pausado"
+                : "Rascunho"}
             </span>
           </div>
         </div>
@@ -211,6 +223,37 @@ export function Toolbar({
           <Save className="h-4 w-4" />
           <span className="hidden sm:inline">Salvar</span>
         </Button>
+
+        {onTogglePause && chatbotStatus !== "draft" && (
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={onTogglePause}
+            isLoading={isPausing}
+            className={
+              chatbotStatus === "published"
+                ? "border-amber-500/30 text-amber-300 hover:bg-amber-500/10"
+                : "border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10"
+            }
+            title={
+              chatbotStatus === "published"
+                ? "Pausar fluxo (desativa respostas no WhatsApp temporariamente)"
+                : "Retomar fluxo (reativa respostas no WhatsApp)"
+            }
+          >
+            {chatbotStatus === "published" ? (
+              <>
+                <Pause className="h-4 w-4 text-amber-400" />
+                <span className="hidden sm:inline">Pausar</span>
+              </>
+            ) : (
+              <>
+                <Play className="h-4 w-4 text-emerald-400" />
+                <span className="hidden sm:inline">Ativar</span>
+              </>
+            )}
+          </Button>
+        )}
 
         <Button
           variant="primary"

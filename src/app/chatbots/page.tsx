@@ -16,6 +16,8 @@ import {
   Layers,
   ArrowUpRight,
   History,
+  Pause,
+  Play,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,7 +34,7 @@ interface ChatbotItem {
   id: string;
   name: string;
   description: string;
-  status: "draft" | "published" | "archived";
+  status: "draft" | "published" | "archived" | "paused";
   current_published_version_id?: string | null;
   current_version?: {
     id: string;
@@ -61,6 +63,7 @@ export default function ChatbotsPage() {
 
   // Publishing
   const [isPublishingId, setIsPublishingId] = useState<string | null>(null);
+  const [isPausingId, setIsPausingId] = useState<string | null>(null);
 
   // Version History Modal
   const [historyTarget, setHistoryTarget] = useState<ChatbotItem | null>(null);
@@ -165,6 +168,36 @@ export default function ChatbotsPage() {
     }
   };
 
+  const handleTogglePause = async (bot: ChatbotItem) => {
+    setIsPausingId(bot.id);
+    try {
+      const res = await fetch(`/api/chatbots/${bot.id}/toggle-pause`, {
+        method: "POST",
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || "Falha ao alterar status");
+      }
+
+      if (json.isPaused) {
+        info(
+          "Fluxo Pausado",
+          `O chatbot "${bot.name}" foi pausado e não responderá no WhatsApp.`
+        );
+      } else {
+        success(
+          "Fluxo Ativado",
+          `O chatbot "${bot.name}" está ativo para o WhatsApp.`
+        );
+      }
+      await fetchChatbots();
+    } catch (err: any) {
+      error("Erro ao alterar status", err.message);
+    } finally {
+      setIsPausingId(null);
+    }
+  };
+
   const filteredBots = chatbots.filter(
     (b) =>
       b.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -236,6 +269,7 @@ export default function ChatbotsPage() {
               <tbody className="divide-y divide-border/60 text-slate-300">
                 {filteredBots.map((bot) => {
                   const isPublished = bot.status === "published";
+                  const isPaused = bot.status === "paused";
                   const versionNum = bot.current_version?.version_number;
 
                   return (
@@ -264,15 +298,21 @@ export default function ChatbotsPage() {
                           className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium border ${
                             isPublished
                               ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
-                              : "bg-amber-500/10 text-amber-400 border-amber-500/30"
+                              : isPaused
+                              ? "bg-amber-500/10 text-amber-400 border-amber-500/30"
+                              : "bg-slate-500/10 text-slate-400 border-slate-500/30"
                           }`}
                         >
                           <span
                             className={`h-1.5 w-1.5 rounded-full ${
-                              isPublished ? "bg-emerald-400" : "bg-amber-400"
+                              isPublished
+                                ? "bg-emerald-400"
+                                : isPaused
+                                ? "bg-amber-400"
+                                : "bg-slate-400"
                             }`}
                           />
-                          {isPublished ? "Publicado" : "Rascunho"}
+                          {isPublished ? "Ativo" : isPaused ? "Pausado" : "Rascunho"}
                         </span>
                       </td>
 
@@ -311,6 +351,38 @@ export default function ChatbotsPage() {
                               <span className="hidden sm:inline">Editar</span>
                             </Button>
                           </Link>
+
+                          {/* Pause / Resume Button */}
+                          {bot.current_published_version_id && (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => handleTogglePause(bot)}
+                              isLoading={isPausingId === bot.id}
+                              className={`h-8 px-2.5 text-xs ${
+                                isPublished
+                                  ? "border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+                                  : "border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+                              }`}
+                              title={
+                                isPublished
+                                  ? "Pausar fluxo (desativa respostas no WhatsApp temporariamente)"
+                                  : "Ativar fluxo (reativa respostas no WhatsApp)"
+                              }
+                            >
+                              {isPublished ? (
+                                <>
+                                  <Pause className="h-3.5 w-3.5" />
+                                  <span className="hidden sm:inline">Pausar</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Play className="h-3.5 w-3.5" />
+                                  <span className="hidden sm:inline">Ativar</span>
+                                </>
+                              )}
+                            </Button>
+                          )}
 
                           {/* Publish button */}
                           <Button

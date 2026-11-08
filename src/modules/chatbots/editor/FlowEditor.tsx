@@ -59,6 +59,7 @@ function FlowEditorInner({
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isPausing, setIsPausing] = useState(false);
 
   // History stack for Undo / Redo
   const [history, setHistory] = useState<{ nodes: FlowNode[]; edges: FlowEdge[] }[]>([
@@ -401,6 +402,36 @@ function FlowEditorInner({
     [setNodes, setEdges, pushHistory, success, error]
   );
 
+  const handleTogglePause = useCallback(async () => {
+    setIsPausing(true);
+    try {
+      const res = await fetch(`/api/chatbots/${chatbotId}/toggle-pause`, {
+        method: "POST",
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || "Erro ao alterar status do fluxo.");
+      }
+
+      setChatbotStatus(json.status);
+      if (json.isPaused) {
+        info(
+          "Fluxo Pausado",
+          "O chatbot não responderá automaticamente a novas mensagens no WhatsApp enquanto estiver pausado."
+        );
+      } else {
+        success(
+          "Fluxo Ativado!",
+          "O chatbot voltou a responder normalmente às mensagens do WhatsApp."
+        );
+      }
+    } catch (err: any) {
+      error("Erro ao Pausar/Ativar", err.message);
+    } finally {
+      setIsPausing(false);
+    }
+  }, [chatbotId, error, info, success]);
+
   const currentFlowData: FlowData = {
     nodes,
     edges,
@@ -416,6 +447,8 @@ function FlowEditorInner({
         chatbotStatus={chatbotStatus}
         isSaving={isSaving}
         isPublishing={isPublishing}
+        isPausing={isPausing}
+        onTogglePause={handleTogglePause}
         canUndo={historyIndex > 0}
         canRedo={historyIndex < history.length - 1}
         isMiniMapOpen={isMiniMapOpen}
