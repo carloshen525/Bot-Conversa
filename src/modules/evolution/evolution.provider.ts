@@ -392,8 +392,9 @@ export class EvolutionProvider implements WhatsAppProvider {
     params: SendTextParams
   ): Promise<SendMessageResult> {
     const clean = this.cleanUrl(baseUrl);
-    const instance = params.instanceName || "default";
-    const endpoint = `${clean}/message/sendText/${instance}`;
+    const instance = (params.instanceName || "default").trim();
+    const encodedInstance = encodeURIComponent(instance);
+    const endpoint = `${clean}/message/sendText/${encodedInstance}`;
 
     const cleanNumber = params.number.replace(/\D/g, "");
 
@@ -435,8 +436,9 @@ export class EvolutionProvider implements WhatsAppProvider {
     params: SendMediaParams
   ): Promise<SendMessageResult> {
     const clean = this.cleanUrl(baseUrl);
-    const instance = params.instanceName || "default";
-    const endpoint = `${clean}/message/sendMedia/${instance}`;
+    const instance = (params.instanceName || "default").trim();
+    const encodedInstance = encodeURIComponent(instance);
+    const endpoint = `${clean}/message/sendMedia/${encodedInstance}`;
 
     const cleanNumber = params.number.replace(/\D/g, "");
 
@@ -483,7 +485,9 @@ export class EvolutionProvider implements WhatsAppProvider {
   ): Promise<ContactProfileResult> {
     const clean = this.cleanUrl(baseUrl);
     const cleanNumber = phone.replace(/\D/g, "");
-    const endpoint = `${clean}/chat/fetchProfile/${instanceName}`;
+    const instance = (instanceName || "default").trim();
+    const encodedInstance = encodeURIComponent(instance);
+    const endpoint = `${clean}/chat/fetchProfile/${encodedInstance}`;
 
     try {
       const response = await this.fetchWithTimeout(endpoint, {

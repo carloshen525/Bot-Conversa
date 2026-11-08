@@ -99,6 +99,11 @@ export default function EvolutionChannelPage() {
           sel = firstOpen.name;
         }
         setSelectedInstanceName(sel);
+
+        const currentActive = insts.find((i) => i.name === sel);
+        if (currentActive?.webhookUrl) {
+          setWebhookUrlInput(currentActive.webhookUrl);
+        }
       }
     } catch (err: any) {
       console.warn("Error loading Evolution config", err);
@@ -671,6 +676,28 @@ export default function EvolutionChannelPage() {
             onChange={(e) => setWebhookUrlInput(e.target.value)}
             helperText="Eventos registrados: MESSAGES_UPSERT, MESSAGES_UPDATE, CONNECTION_UPDATE"
           />
+
+          {webhookUrlInput.includes("localhost") || webhookUrlInput.includes("127.0.0.1") ? (
+            <div className="rounded-lg bg-amber-500/10 border border-amber-500/30 p-3 text-xs text-amber-200 space-y-1.5">
+              <div className="flex items-center gap-1.5 font-semibold text-amber-300">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>Servidor da Evolution API em Nuvem detectado</span>
+              </div>
+              <p className="text-[11px] text-amber-200/90 leading-relaxed">
+                Como seu servidor da Evolution API está na nuvem (<code>{baseUrl}</code>), ele não consegue acessar endereços <code>localhost</code> do seu computador particular.
+              </p>
+              <p className="text-[11px] text-amber-200/90 leading-relaxed">
+                Para testar no WhatsApp do seu celular durante o desenvolvimento local, utilize uma URL de túnel público (como <strong>ngrok</strong> ou <strong>localtunnel</strong>) apontando para a porta 3000.
+              </p>
+            </div>
+          ) : (
+            <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/30 p-3 text-xs text-emerald-300 flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
+              <span>
+                <strong>URL Pública Ativa:</strong> A Evolution API na nuvem consegue entregar os eventos do WhatsApp diretamente para este sistema.
+              </span>
+            </div>
+          )}
 
           <div className="flex items-center justify-between pt-2 border-t border-border/60">
             <p className="text-xs text-muted-foreground">

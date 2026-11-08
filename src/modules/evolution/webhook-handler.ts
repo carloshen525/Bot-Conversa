@@ -24,12 +24,28 @@ export class EvolutionWebhookHandler {
     reason?: string;
     conversationStateId?: string;
   }> {
-    // Only process incoming messages (messages.upsert)
-    if (event.event !== "messages.upsert" && !event.data?.key) {
+    // Only process incoming messages (messages.upsert, case-insensitive)
+    const rawEvent = (event.event || "").toLowerCase();
+    const isMessageUpsert =
+      rawEvent === "messages.upsert" ||
+      rawEvent === "messages_upsert" ||
+      rawEvent === "message.upsert" ||
+      Boolean(event.data?.key);
+
+    if (!isMessageUpsert) {
       return { processed: false, reason: `Ignored event type: ${event.event}` };
     }
 
-    const { key, message, pushName } = event.data;
+    // Extract message item supporting varying payload topologies (flat, nested, array)
+    const dataObj = Array.isArray(event.data) ? event.data[0] : event.data;
+    const actualData = dataObj?.key ? dataObj : dataObj?.data || dataObj;
+    const key = actualData?.key;
+    const message = actualData?.message;
+    const pushName = actualData?.pushName || "Contato WhatsApp";
+
+    if (!key) {
+      return { processed: false, reason: "No message key found in webhook payload" };
+    }
 
     // Ignore messages sent by ourselves or group chats (for V1 individual contacts)
     if (key.fromMe) {
@@ -46,6 +62,9 @@ export class EvolutionWebhookHandler {
       message?.conversation ||
       message?.extendedTextMessage?.text ||
       message?.imageMessage?.caption ||
+      message?.videoMessage?.caption ||
+      message?.documentMessage?.caption ||
+      actualData?.body ||
       "";
 
     // 1. Get or create Contact
@@ -90,11 +109,20 @@ export class EvolutionWebhookHandler {
         // Find start node in flow
         const startNode = ver.flow_data.nodes.find((n) => n.type === "startNode");
         const startData = startNode?.data as any;
+        const triggerType = startData?.triggerType || "new_conversation";
+
+        // Parse keywords whether string or array
+        const rawKeywords = startData?.keywords;
+        const keywords: string[] = Array.isArray(rawKeywords)
+          ? rawKeywords
+          : typeof rawKeywords === "string"
+          ? rawKeywords.split(/[\s,]+/).filter(Boolean)
+          : [];
 
         // Keyword trigger check
-        if (startData?.triggerType === "keyword" && Array.isArray(startData.keywords)) {
+        if (triggerType === "keyword" && keywords.length > 0) {
           const lowerText = messageText.trim().toLowerCase();
-          const match = startData.keywords.some((kw: string) =>
+          const match = keywords.some((kw: string) =>
             lowerText.includes(kw.trim().toLowerCase())
           );
           if (match) {
@@ -102,8 +130,8 @@ export class EvolutionWebhookHandler {
             matchedVersion = ver;
             break;
           }
-        } else if (startData?.triggerType === "new_conversation" && !matchedBot) {
-          // Fallback to new_conversation bot if no keyword matched yet
+        } else if (triggerType === "new_conversation" || triggerType === "manual" || !matchedBot) {
+          // Fallback to published bot if new_conversation or default candidate
           matchedBot = bot;
           matchedVersion = ver;
         }
@@ -153,13 +181,24 @@ export class EvolutionWebhookHandler {
     // 5. Dispatch actions
     for (const action of result.dispatchedActions) {
       if (action.type === "send_text_message") {
-        await this.evolutionClient.sendTextMessage({
+        const sendRes = await this.evolutionClient.sendTextMessage({
           number: phone,
           text: String(action.payload.text || ""),
           delay: Number(action.payload.delaySeconds || 1),
         });
+        if (!sendRes.success) {
+          await logRepository.insert({
+            execution_id: execution.id,
+            conversation_state_id: state.id,
+            chatbot_id: publishedVersion.chatbot_id,
+            level: "error",
+            node_id: "send_text_failed",
+            message: `Falha ao enviar mensagem de texto para WhatsApp (${phone}): ${sendRes.error}`,
+            details: { phone, error: sendRes.error },
+          });
+        }
       } else if (action.type === "send_media_message") {
-        await this.evolutionClient.sendMediaMessage({
+        const sendRes = await this.evolutionClient.sendMediaMessage({
           number: phone,
           mediatype: action.payload.mediaType as any,
           media: String(action.payload.mediaUrl || ""),
@@ -167,6 +206,17 @@ export class EvolutionWebhookHandler {
           fileName: String(action.payload.fileName || ""),
           delay: Number(action.payload.delaySeconds || 1),
         });
+        if (!sendRes.success) {
+          await logRepository.insert({
+            execution_id: execution.id,
+            conversation_state_id: state.id,
+            chatbot_id: publishedVersion.chatbot_id,
+            level: "error",
+            node_id: "send_media_failed",
+            message: `Falha ao enviar mídia para WhatsApp (${phone}): ${sendRes.error}`,
+            details: { phone, error: sendRes.error },
+          });
+        }
       }
     }
 
