@@ -74,7 +74,9 @@ export class ChatbotService {
     flowData: FlowData,
     testContact: Partial<ContactData> & { phone: string },
     messageText?: string,
-    existingVariables: Record<string, string> = {}
+    existingVariables: Record<string, string> = {},
+    currentNodeId?: string | null,
+    currentStatus?: string
   ) {
     const contact: ContactData = {
       id: "sim_contact_1",
@@ -89,8 +91,8 @@ export class ChatbotService {
       contact_id: contact.id,
       chatbot_id: "sim_bot",
       chatbot_version_id: "sim_ver",
-      current_node_id: null,
-      status: "active" as const,
+      current_node_id: currentNodeId !== undefined ? currentNodeId : null,
+      status: (currentStatus as any) || (currentNodeId ? "waiting_input" : "active"),
       variables: { ...contact.variables },
       resume_at: null,
       execution_context: { history: [] },
@@ -98,7 +100,7 @@ export class ChatbotService {
     };
 
     const triggerEvent: EngineTriggerEvent = {
-      type: messageText ? "user_reply" : "new_conversation",
+      type: currentNodeId ? "user_reply" : messageText ? "keyword" : "new_conversation",
       messageText,
       timestamp: new Date().toISOString(),
     };

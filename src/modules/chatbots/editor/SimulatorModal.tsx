@@ -28,27 +28,42 @@ export function SimulatorModal({ isOpen, onClose, flowData }: SimulatorModalProp
   const [contactPhone, setContactPhone] = useState("5511988887777");
   const [tags, setTags] = useState<string[]>([]);
   const [variables, setVariables] = useState<Record<string, string>>({});
+  const [currentNodeId, setCurrentNodeId] = useState<string | null>(null);
+  const [conversationStatus, setConversationStatus] = useState<string>("active");
 
-  const startSimulation = async (initialTrigger?: string) => {
+  const startSimulation = async (userReply?: string, isReset: boolean = false) => {
     setIsLoading(true);
     try {
+      const activeNode = isReset ? null : currentNodeId;
+      const activeStatus = isReset ? "active" : conversationStatus;
+
       const res = await fetch("/api/execution/simulate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           flowData,
           contact: { name: contactName, phone: contactPhone, tags, variables },
-          messageText: initialTrigger || undefined,
+          messageText: userReply || undefined,
           variables,
+          currentNodeId: activeNode,
+          status: activeStatus,
         }),
       });
 
       const json = await res.json();
       if (json.success && json.data) {
-        const { dispatchedActions, updatedTags, updatedVariables, tags: resTags, variables: resVars } = json.data;
+        const {
+          dispatchedActions,
+          tags: resTags,
+          variables: resVars,
+          currentNodeId: nextNodeId,
+          finalStatus,
+        } = json.data;
 
         if (resTags) setTags(resTags);
         if (resVars) setVariables(resVars);
+        setCurrentNodeId(nextNodeId !== undefined ? nextNodeId : null);
+        setConversationStatus(finalStatus || "completed");
 
         const newBotMessages: ChatMessage[] = [];
         for (const action of dispatchedActions) {
@@ -102,7 +117,9 @@ export function SimulatorModal({ isOpen, onClose, flowData }: SimulatorModalProp
     setMessages([]);
     setTags([]);
     setVariables({});
-    startSimulation();
+    setCurrentNodeId(null);
+    setConversationStatus("active");
+    startSimulation(undefined, true);
   };
 
   return (
@@ -217,6 +234,36 @@ export function SimulatorModal({ isOpen, onClose, flowData }: SimulatorModalProp
           </h4>
 
           <div className="flex-1 overflow-y-auto space-y-3 custom-scrollbar pr-1">
+            {/* Status of flow */}
+            <div>
+              <span className="text-[10px] font-semibold uppercase text-muted-foreground tracking-wider">
+                Status da Execução
+              </span>
+              <div className="flex items-center gap-1.5 mt-1">
+                <span
+                  className={`h-2 w-2 rounded-full ${
+                    conversationStatus === "waiting_input"
+                      ? "bg-amber-400 animate-pulse"
+                      : conversationStatus === "completed"
+                      ? "bg-emerald-400"
+                      : "bg-indigo-400"
+                  }`}
+                />
+                <span className="text-[11px] font-medium text-foreground capitalize">
+                  {conversationStatus === "waiting_input"
+                    ? "Aguardando Resposta"
+                    : conversationStatus === "completed"
+                    ? "Finalizado"
+                    : "Ativo"}
+                </span>
+              </div>
+              {currentNodeId && (
+                <p className="text-[10px] text-muted-foreground font-mono mt-0.5">
+                  Nó atual: {currentNodeId}
+                </p>
+              )}
+            </div>
+
             {/* Contact info */}
             <div>
               <span className="text-[10px] font-semibold uppercase text-muted-foreground tracking-wider">

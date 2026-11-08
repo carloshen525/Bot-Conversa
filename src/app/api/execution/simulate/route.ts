@@ -3,7 +3,7 @@ import { chatbotService } from "@/modules/chatbots/service";
 
 export async function POST(req: NextRequest) {
   try {
-    const { flowData, contact, messageText, variables } = await req.json();
+    const { flowData, contact, messageText, variables, currentNodeId, status } = await req.json();
 
     if (!flowData || !flowData.nodes) {
       return NextResponse.json(
@@ -16,7 +16,9 @@ export async function POST(req: NextRequest) {
       flowData,
       contact || { phone: "5511999999999", name: "Contato Teste" },
       messageText,
-      variables || {}
+      variables || {},
+      currentNodeId,
+      status
     );
 
     return NextResponse.json({ success: true, data: result });
