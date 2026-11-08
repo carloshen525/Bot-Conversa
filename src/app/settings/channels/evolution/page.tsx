@@ -89,8 +89,16 @@ export default function EvolutionChannelPage() {
         setIsConnected(Boolean(json.data.isConnected));
         setLastTestedAt(json.data.lastTestedAt);
         setLastSyncedAt(json.data.lastSyncedAt);
-        setSelectedInstanceName(json.data.selectedInstanceName);
-        setInstances(json.data.instances || []);
+
+        const insts: InstanceData[] = json.data.instances || [];
+        setInstances(insts);
+
+        let sel = json.data.selectedInstanceName;
+        if ((!sel || !insts.some((i) => i.name === sel)) && insts.length > 0) {
+          const firstOpen = insts.find((i) => i.status === "open") || insts[0];
+          sel = firstOpen.name;
+        }
+        setSelectedInstanceName(sel);
       }
     } catch (err: any) {
       console.warn("Error loading Evolution config", err);
@@ -157,9 +165,19 @@ export default function EvolutionChannelPage() {
 
       const json = await res.json();
       if (json.success && Array.isArray(json.instances)) {
-        setInstances(json.instances);
+        const insts: InstanceData[] = json.instances;
+        setInstances(insts);
         setLastSyncedAt(new Date().toISOString());
-        success("Instâncias Localizadas", `${json.instances.length} instância(s) encontrada(s) no servidor.`);
+
+        // Auto-select valid instance if current is not in the list
+        const exists = insts.some((i) => i.name === selectedInstanceName);
+        if (!exists && insts.length > 0) {
+          const firstOpen = insts.find((i) => i.status === "open") || insts[0];
+          setSelectedInstanceName(firstOpen.name);
+          handleSelectInstance(firstOpen.name);
+        }
+
+        success("Instâncias Localizadas", `${insts.length} instância(s) encontrada(s) no servidor.`);
       } else {
         throw new Error(json.error || "Nenhuma instância retornada.");
       }

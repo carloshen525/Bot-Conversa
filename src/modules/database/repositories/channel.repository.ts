@@ -79,8 +79,16 @@ export class ChannelRepository {
   }
 
   public async setInstances(instances: InstanceInfo[]): Promise<void> {
-    // Preserve default flag if already selected
-    const selected = this.config.selectedInstanceName;
+    let selected = this.config.selectedInstanceName;
+    const exists = instances.some((i) => i.name === selected);
+
+    // If current selected does not exist in the fetched instances, auto-select the first connected or first instance
+    if (!exists && instances.length > 0) {
+      const firstOpen = instances.find((i) => i.status === "open") || instances[0];
+      selected = firstOpen.name;
+      this.config.selectedInstanceName = selected;
+    }
+
     const mapped = instances.map((inst) => ({
       ...inst,
       isDefault: inst.name === selected,

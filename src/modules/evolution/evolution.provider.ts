@@ -303,14 +303,26 @@ export class EvolutionProvider implements WhatsAppProvider {
       };
     }
 
-    const endpoint = `${clean}/webhook/set/${params.instanceName}`;
+    const encodedInstance = encodeURIComponent(params.instanceName.trim());
+    const endpoint = `${clean}/webhook/set/${encodedInstance}`;
     const defaultEvents = [
       "MESSAGES_UPSERT",
       "MESSAGES_UPDATE",
       "CONNECTION_UPDATE",
     ];
 
-    const body = {
+    // Payload format 1: Evolution API v2 nested object
+    const v2Body = {
+      webhook: {
+        enabled: params.enabled !== false,
+        url: params.webhookUrl,
+        webhookByEvents: false,
+        events: params.events || defaultEvents,
+      },
+    };
+
+    // Payload format 2: Evolution API v1 flat object
+    const v1Body = {
       enabled: params.enabled !== false,
       url: params.webhookUrl,
       webhookByEvents: false,
@@ -318,17 +330,42 @@ export class EvolutionProvider implements WhatsAppProvider {
     };
 
     try {
-      const response = await this.fetchWithTimeout(endpoint, {
+      // First attempt with v2 nested format
+      let response = await this.fetchWithTimeout(endpoint, {
         method: "POST",
         headers: this.getHeaders(apiKey),
-        body: JSON.stringify(body),
+        body: JSON.stringify(v2Body),
       });
 
+      // If v2 returned 400, fallback to v1 flat format
+      if (response.status === 400) {
+        response = await this.fetchWithTimeout(endpoint, {
+          method: "POST",
+          headers: this.getHeaders(apiKey),
+          body: JSON.stringify(v1Body),
+        });
+      }
+
       if (!response.ok) {
-        const errorText = await response.text();
+        let errorMsg = `Status ${response.status}`;
+        try {
+          const errJson = await response.json();
+          if (errJson?.response?.message) {
+            errorMsg = Array.isArray(errJson.response.message)
+              ? errJson.response.message.join(", ")
+              : String(errJson.response.message);
+          } else if (errJson?.message) {
+            errorMsg = Array.isArray(errJson.message) ? errJson.message.join(", ") : String(errJson.message);
+          } else if (errJson?.error) {
+            errorMsg = String(errJson.error);
+          }
+        } catch {
+          errorMsg = await response.text();
+        }
+
         return {
           success: false,
-          message: `Falha ao registrar webhook na Evolution API (${response.status}): ${errorText}`,
+          message: `Falha ao registrar webhook na Evolution API: ${errorMsg}`,
         };
       }
 
@@ -336,7 +373,7 @@ export class EvolutionProvider implements WhatsAppProvider {
         success: true,
         message: `Webhook registrado e ativado com sucesso para a instância "${params.instanceName}".`,
         webhookUrl: params.webhookUrl,
-        events: body.events,
+        events: defaultEvents,
       };
     } catch (err: any) {
       return {

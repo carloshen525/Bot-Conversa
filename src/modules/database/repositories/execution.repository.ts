@@ -158,6 +158,25 @@ export class ExecutionRepository {
       .sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime())
       .slice(0, limit);
   }
+
+  /**
+   * Finds conversations waiting for delay that are due to resume (resume_at <= now())
+   */
+  public async findDueDelayedStates(): Promise<ConversationStateRecord[]> {
+    const now = new Date();
+    const due: ConversationStateRecord[] = [];
+
+    for (const state of Array.from(this.states.values())) {
+      if (state.status === "waiting_delay" && state.resume_at) {
+        const resumeTime = new Date(state.resume_at);
+        if (resumeTime <= now) {
+          due.push(state);
+        }
+      }
+    }
+
+    return due;
+  }
 }
 
 export const executionRepository = new ExecutionRepository();
