@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import {
   Settings,
   Radio,
@@ -11,6 +12,9 @@ import {
   Sparkles,
   Server,
   Key,
+  ArrowRight,
+  ChevronRight,
+  Globe,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -92,8 +96,45 @@ export default function SettingsPage() {
       <div className="border-b border-border/80 pb-6">
         <h1 className="text-2xl font-bold text-foreground tracking-tight">Configurações</h1>
         <p className="text-xs text-muted-foreground mt-1">
-          Gerencie integrações com Evolution API, banco de dados Supabase e endpoints de Webhook.
+          Gerencie integrações com Evolution API, canais do WhatsApp, banco de dados Supabase e endpoints de Webhook.
         </p>
+      </div>
+
+      {/* Canais de Comunicação Card */}
+      <div className="space-y-3">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          Canais de Comunicação
+        </h2>
+        <Link
+          href="/settings/channels/evolution"
+          className="group block rounded-xl border border-indigo-500/30 bg-gradient-to-r from-[#141622] to-[#10121a] p-5 transition-all duration-150 hover:border-indigo-500 hover:shadow-lg hover:shadow-indigo-500/5"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3.5">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-600/20 text-indigo-400 border border-indigo-500/30">
+                <Radio className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-foreground group-hover:text-white">
+                    Evolution API
+                  </h3>
+                  <span className="rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[10px] font-semibold px-2 py-0.2">
+                    Oficial
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Conecte seu servidor, busque instâncias do WhatsApp automaticamente e defina a instância padrão dos chatbots.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-indigo-400 group-hover:translate-x-0.5 transition-transform">
+              <span>Gerenciar Instâncias</span>
+              <ChevronRight className="h-4 w-4" />
+            </div>
+          </div>
+        </Link>
       </div>
 
       {/* Webhook Configuration Card */}

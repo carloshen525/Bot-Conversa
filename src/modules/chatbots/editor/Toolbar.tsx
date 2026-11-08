@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Save,
@@ -11,6 +11,9 @@ import {
   Redo2,
   PlayCircle,
   ArrowLeft,
+  History,
+  Download,
+  Upload,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -31,6 +34,9 @@ interface ToolbarProps {
   onFitView: () => void;
   onToggleMiniMap: () => void;
   onOpenSimulator: () => void;
+  onOpenHistory?: () => void;
+  onExportJson?: () => void;
+  onImportJson?: (event: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
 export function Toolbar({
@@ -50,9 +56,23 @@ export function Toolbar({
   onFitView,
   onToggleMiniMap,
   onOpenSimulator,
+  onOpenHistory,
+  onExportJson,
+  onImportJson,
 }: ToolbarProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   return (
     <header className="h-14 border-b border-border bg-[#0d0f15] px-4 flex items-center justify-between select-none z-10">
+      {/* Hidden file input for importing JSON flow */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={onImportJson}
+        accept=".json,application/json"
+        className="hidden"
+      />
+
       {/* Left side: Back button & Chatbot title */}
       <div className="flex items-center gap-3">
         <Link
@@ -134,10 +154,44 @@ export function Toolbar({
         >
           <MapIcon className="h-4 w-4" />
         </button>
+
+        <div className="h-4 w-[1px] bg-border mx-1" />
+
+        {onExportJson && (
+          <button
+            onClick={onExportJson}
+            title="Exportar Fluxo em JSON"
+            className="rounded-md p-1.5 text-muted-foreground hover:bg-white/5 hover:text-foreground"
+          >
+            <Download className="h-4 w-4" />
+          </button>
+        )}
+        {onImportJson && (
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            title="Importar Fluxo JSON"
+            className="rounded-md p-1.5 text-muted-foreground hover:bg-white/5 hover:text-foreground"
+          >
+            <Upload className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
-      {/* Right side: Simulator, Save, Publish */}
+      {/* Right side: Simulator, History, Save, Publish */}
       <div className="flex items-center gap-2">
+        {onOpenHistory && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onOpenHistory}
+            className="text-xs text-muted-foreground hover:text-foreground"
+            title="Ver snapshots publicados e realizar rollback"
+          >
+            <History className="h-4 w-4" />
+            <span className="hidden lg:inline">Versões</span>
+          </Button>
+        )}
+
         <Button
           variant="secondary"
           size="sm"

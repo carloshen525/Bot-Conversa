@@ -410,6 +410,32 @@ export class ChatbotRepository {
   public async getVersionById(versionId: string): Promise<ChatbotVersion | null> {
     return this.store.versions.get(versionId) || null;
   }
+
+  /**
+   * ROLLBACK: Restores an immutable past snapshot into the draft and sets it as active published version.
+   */
+  public async rollbackToVersion(
+    chatbotId: string,
+    versionId: string
+  ): Promise<{ restoredVersion: ChatbotVersion; draft: ChatbotDraft }> {
+    const bot = this.store.chatbots.get(chatbotId);
+    if (!bot) throw new Error("Chatbot não encontrado");
+
+    const targetVersion = this.store.versions.get(versionId);
+    if (!targetVersion || targetVersion.chatbot_id !== chatbotId) {
+      throw new Error("Versão não encontrada para este chatbot");
+    }
+
+    const clonedFlow: FlowData = JSON.parse(JSON.stringify(targetVersion.flow_data));
+    const draft = await this.saveDraft(chatbotId, clonedFlow);
+
+    bot.status = "published";
+    bot.current_published_version_id = versionId;
+    bot.updated_at = new Date().toISOString();
+    this.store.chatbots.set(chatbotId, bot);
+
+    return { restoredVersion: targetVersion, draft };
+  }
 }
 
 export const chatbotRepository = new ChatbotRepository();

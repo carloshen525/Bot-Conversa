@@ -66,6 +66,20 @@ export class ChatbotService {
     return chatbotRepository.getVersions(chatbotId);
   }
 
+  public async rollbackVersion(chatbotId: string, versionId: string) {
+    const res = await chatbotRepository.rollbackToVersion(chatbotId, versionId);
+
+    await logRepository.insert({
+      chatbot_id: chatbotId,
+      level: "warn",
+      node_id: "system",
+      message: `Rollback realizado para a versão ${res.restoredVersion.version_number}.`,
+      details: { versionId, versionNumber: res.restoredVersion.version_number },
+    });
+
+    return res;
+  }
+
   /**
    * Simulates/tests execution of a flow in draft mode or published mode.
    * This allows the user to test the chatbot visual editor interactively!

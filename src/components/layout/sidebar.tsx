@@ -70,7 +70,7 @@ export function Sidebar() {
         </div>
         {NAV_ITEMS.map((item) => {
           const isActive =
-            item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+            item.href === "/" ? pathname === "/" : pathname === item.href;
           const Icon = item.icon;
 
           return (
@@ -101,6 +101,27 @@ export function Sidebar() {
             </Link>
           );
         })}
+
+        <div className="pt-3 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+          Canais WhatsApp
+        </div>
+        <Link
+          href="/settings/channels/evolution"
+          className={cn(
+            "flex items-center justify-between rounded-lg px-3 py-2 text-xs font-medium transition-all duration-150 group",
+            pathname.startsWith("/settings/channels/evolution")
+              ? "bg-indigo-600/15 text-indigo-400 border border-indigo-500/25 shadow-sm"
+              : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
+          )}
+        >
+          <div className="flex items-center gap-2.5">
+            <span className="h-2 w-2 rounded-full bg-emerald-400" />
+            <span>Evolution API</span>
+          </div>
+          <span className="rounded bg-emerald-500/10 px-1.5 py-0.2 text-[9px] font-semibold text-emerald-400">
+            Ativo
+          </span>
+        </Link>
       </nav>
 
       {/* Engine Status Card */}
