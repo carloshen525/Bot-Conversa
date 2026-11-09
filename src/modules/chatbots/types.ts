@@ -28,6 +28,8 @@ export interface MessageNodeData extends Record<string, unknown> {
   content: string;
   mediaUrl?: string;
   fileName?: string;
+  fileSize?: number;
+  mimeType?: string;
   delaySeconds?: number;
 }
 

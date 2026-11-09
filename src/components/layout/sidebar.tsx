@@ -170,10 +170,10 @@ export function Sidebar() {
             )}
             <div className="min-w-0 flex-1">
               <p className="text-xs font-semibold text-foreground truncate">
-                {profile?.nome || "Carlos Henrique"}
+                {profile?.nome || "Administrador"}
               </p>
               <p className="text-[10px] text-muted-foreground truncate">
-                {profile?.email || "carloshenrq1245@gmail.com"}
+                {profile?.email || "admin@botconversa.com"}
               </p>
             </div>
           </div>

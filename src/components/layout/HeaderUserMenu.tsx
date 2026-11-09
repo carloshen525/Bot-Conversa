@@ -23,8 +23,8 @@ export function HeaderUserMenu() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const displayName = profile?.nome || "Carlos Henrique";
-  const displayEmail = profile?.email || "carloshenrq1245@gmail.com";
+  const displayName = profile?.nome || "Administrador";
+  const displayEmail = profile?.email || "admin@botconversa.com";
   const avatarUrl = profile?.avatar;
 
   return (

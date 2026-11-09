@@ -1,3 +1,5 @@
+import fs from "fs";
+import path from "path";
 import { FlowData, Chatbot, ChatbotDraft, ChatbotVersion } from "../../chatbots/types";
 import { generateId } from "../../shared/utils";
 
@@ -148,6 +150,50 @@ const DEFAULT_INITIAL_FLOW: FlowData = {
   ],
 };
 
+const DATA_DIR = path.join(process.cwd(), "data");
+const DB_FILE = path.join(DATA_DIR, "chatbots-db.json");
+
+function ensureDataDir() {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+}
+
+function loadPersistedData(): {
+  chatbots: Chatbot[];
+  drafts: ChatbotDraft[];
+  versions: ChatbotVersion[];
+} | null {
+  try {
+    ensureDataDir();
+    if (fs.existsSync(DB_FILE)) {
+      const content = fs.readFileSync(DB_FILE, "utf-8");
+      return JSON.parse(content);
+    }
+  } catch (err) {
+    console.error("[ChatbotRepository] Erro ao carregar chatbots-db.json:", err);
+  }
+  return null;
+}
+
+function savePersistedData(store: {
+  chatbots: Map<string, Chatbot>;
+  drafts: Map<string, ChatbotDraft>;
+  versions: Map<string, ChatbotVersion>;
+}) {
+  try {
+    ensureDataDir();
+    const payload = {
+      chatbots: Array.from(store.chatbots.values()),
+      drafts: Array.from(store.drafts.values()),
+      versions: Array.from(store.versions.values()),
+    };
+    fs.writeFileSync(DB_FILE, JSON.stringify(payload, null, 2), "utf-8");
+  } catch (err) {
+    console.error("[ChatbotRepository] Erro ao salvar chatbots-db.json:", err);
+  }
+}
+
 // Global in-memory storage for high reliability across Next.js API calls in dev
 declare global {
   // eslint-disable-next-line no-var
@@ -167,39 +213,48 @@ if (!global.__BOT_CONVERSA_DB__) {
     versions: new Map(),
   };
 
-  // Seed default chatbot
-  const defaultBotId = "bot_onboarding_demo";
-  const defaultVersionId = "ver_onboarding_v1";
+  const persisted = loadPersistedData();
+  if (persisted && persisted.chatbots.length > 0) {
+    persisted.chatbots.forEach((b) => global.__BOT_CONVERSA_DB__!.chatbots.set(b.id, b));
+    persisted.drafts.forEach((d) => global.__BOT_CONVERSA_DB__!.drafts.set(d.chatbot_id, d));
+    persisted.versions.forEach((v) => global.__BOT_CONVERSA_DB__!.versions.set(v.id, v));
+  } else {
+    // Seed default chatbot
+    const defaultBotId = "bot_onboarding_demo";
+    const defaultVersionId = "ver_onboarding_v1";
 
-  const defaultBot: Chatbot = {
-    id: defaultBotId,
-    name: "Atendimento Geral & Boas-Vindas",
-    description: "Fluxo padrão de recepção de clientes com menu e triagem automática",
-    status: "published",
-    current_published_version_id: defaultVersionId,
-    created_at: new Date(Date.now() - 3600000 * 24 * 3).toISOString(),
-    updated_at: new Date(Date.now() - 3600000 * 5).toISOString(),
-  };
+    const defaultBot: Chatbot = {
+      id: defaultBotId,
+      name: "Atendimento Geral & Boas-Vindas",
+      description: "Fluxo padrão de recepção de clientes com menu e triagem automática",
+      status: "published",
+      current_published_version_id: defaultVersionId,
+      created_at: new Date(Date.now() - 3600000 * 24 * 3).toISOString(),
+      updated_at: new Date(Date.now() - 3600000 * 5).toISOString(),
+    };
 
-  const defaultDraft: ChatbotDraft = {
-    id: `draft_${defaultBotId}`,
-    chatbot_id: defaultBotId,
-    flow_data: JSON.parse(JSON.stringify(DEFAULT_INITIAL_FLOW)),
-    updated_at: new Date(Date.now() - 3600000 * 5).toISOString(),
-  };
+    const defaultDraft: ChatbotDraft = {
+      id: `draft_${defaultBotId}`,
+      chatbot_id: defaultBotId,
+      flow_data: JSON.parse(JSON.stringify(DEFAULT_INITIAL_FLOW)),
+      updated_at: new Date(Date.now() - 3600000 * 5).toISOString(),
+    };
 
-  const defaultVersion: ChatbotVersion = {
-    id: defaultVersionId,
-    chatbot_id: defaultBotId,
-    version_number: 1,
-    flow_data: JSON.parse(JSON.stringify(DEFAULT_INITIAL_FLOW)),
-    changelog: "Versão inicial publicada com triagem e tags",
-    published_at: new Date(Date.now() - 3600000 * 5).toISOString(),
-  };
+    const defaultVersion: ChatbotVersion = {
+      id: defaultVersionId,
+      chatbot_id: defaultBotId,
+      version_number: 1,
+      flow_data: JSON.parse(JSON.stringify(DEFAULT_INITIAL_FLOW)),
+      changelog: "Versão inicial publicada com triagem e tags",
+      published_at: new Date(Date.now() - 3600000 * 5).toISOString(),
+    };
 
-  global.__BOT_CONVERSA_DB__.chatbots.set(defaultBotId, defaultBot);
-  global.__BOT_CONVERSA_DB__.drafts.set(defaultBotId, defaultDraft);
-  global.__BOT_CONVERSA_DB__.versions.set(defaultVersionId, defaultVersion);
+    global.__BOT_CONVERSA_DB__.chatbots.set(defaultBotId, defaultBot);
+    global.__BOT_CONVERSA_DB__.drafts.set(defaultBotId, defaultDraft);
+    global.__BOT_CONVERSA_DB__.versions.set(defaultVersionId, defaultVersion);
+
+    savePersistedData(global.__BOT_CONVERSA_DB__);
+  }
 }
 
 export class ChatbotRepository {
@@ -281,6 +336,7 @@ export class ChatbotRepository {
 
     this.store.chatbots.set(id, chatbot);
     this.store.drafts.set(id, draft);
+    savePersistedData(this.store);
 
     return chatbot;
   }
@@ -296,6 +352,7 @@ export class ChatbotRepository {
     };
 
     this.store.chatbots.set(id, updated);
+    savePersistedData(this.store);
     return updated;
   }
 
@@ -310,6 +367,7 @@ export class ChatbotRepository {
         this.store.versions.delete(vId);
       }
     }
+    savePersistedData(this.store);
     return true;
   }
 
@@ -354,6 +412,7 @@ export class ChatbotRepository {
       this.store.chatbots.set(chatbotId, bot);
     }
 
+    savePersistedData(this.store);
     return draft;
   }
 
@@ -398,6 +457,7 @@ export class ChatbotRepository {
     bot.updated_at = now;
     this.store.chatbots.set(chatbotId, bot);
 
+    savePersistedData(this.store);
     return newVersion;
   }
 
@@ -434,6 +494,7 @@ export class ChatbotRepository {
     bot.updated_at = new Date().toISOString();
     this.store.chatbots.set(chatbotId, bot);
 
+    savePersistedData(this.store);
     return { restoredVersion: targetVersion, draft };
   }
 }

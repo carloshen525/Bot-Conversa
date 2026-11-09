@@ -18,8 +18,8 @@ export async function POST(req: NextRequest) {
 
     // 1. Placeholder / Local Dev Fallback Mode
     if (isPlaceholderSupabase()) {
-      const ADMIN_EMAIL = "carloshenrq1245@gmail.com";
-      const ADMIN_PASS = "123357281tT$";
+      const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "admin@botconversa.local").trim().toLowerCase();
+      const ADMIN_PASS = process.env.ADMIN_PASSWORD || "admin123";
 
       if (cleanEmail !== ADMIN_EMAIL || password !== ADMIN_PASS) {
         return NextResponse.json(

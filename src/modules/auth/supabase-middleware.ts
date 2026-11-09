@@ -9,6 +9,7 @@ export async function updateSession(request: NextRequest) {
   const isPublicRoute =
     pathname === "/login" ||
     pathname.startsWith("/login") ||
+    pathname.startsWith("/uploads") ||
     pathname.startsWith("/api/webhooks") ||
     pathname.startsWith("/api/auth");
 

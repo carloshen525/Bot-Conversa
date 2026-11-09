@@ -1,3 +1,5 @@
+import fs from "fs";
+import path from "path";
 import { InstanceInfo } from "../../evolution/provider.interface";
 import { generateId } from "../../shared/utils";
 
@@ -13,51 +15,77 @@ export interface ChannelConfig {
   instances: InstanceInfo[];
 }
 
+const DATA_DIR = path.join(process.cwd(), "data");
+const CONFIG_FILE = path.join(DATA_DIR, "channel-config.json");
+
+function ensureDataDir() {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+}
+
+function loadPersistedConfig(): ChannelConfig | null {
+  try {
+    ensureDataDir();
+    if (fs.existsSync(CONFIG_FILE)) {
+      const content = fs.readFileSync(CONFIG_FILE, "utf-8");
+      return JSON.parse(content);
+    }
+  } catch (err) {
+    console.error("[ChannelRepository] Erro ao carregar channel-config.json:", err);
+  }
+  return null;
+}
+
+function savePersistedConfig(config: ChannelConfig) {
+  try {
+    ensureDataDir();
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), "utf-8");
+  } catch (err) {
+    console.error("[ChannelRepository] Erro ao salvar channel-config.json:", err);
+  }
+}
+
 declare global {
   // eslint-disable-next-line no-var
   var __BOT_CONVERSA_CHANNEL_CONFIG__: ChannelConfig | undefined;
 }
 
 if (!global.__BOT_CONVERSA_CHANNEL_CONFIG__) {
-  // Initial seed configuration with realistic default instances
-  const defaultInstances: InstanceInfo[] = [
-    {
-      id: "inst_vendas",
-      name: "vendas",
-      status: "open",
-      number: "5535999999999",
-      profileName: "Carlos Henrique - Atendimento",
-      profilePictureUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80",
-      updatedAt: new Date(Date.now() - 3600000 * 2).toISOString(),
-      webhookUrl: "http://localhost:3000/api/webhooks/evolution",
-      webhookEnabled: true,
-      isDefault: true,
-    },
-    {
-      id: "inst_suporte",
-      name: "suporte",
-      status: "open",
-      number: "5535988888888",
-      profileName: "Suporte Técnico XYZ",
-      profilePictureUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80",
-      updatedAt: new Date(Date.now() - 3600000 * 8).toISOString(),
-      webhookUrl: "",
-      webhookEnabled: false,
-      isDefault: false,
-    },
-  ];
+  const persisted = loadPersistedConfig();
 
-  global.__BOT_CONVERSA_CHANNEL_CONFIG__ = {
-    id: "cfg_evolution_main",
-    provider: "evolution",
-    baseUrl: process.env.NEXT_PUBLIC_EVOLUTION_API_URL || "http://localhost:8080",
-    apiKey: process.env.EVOLUTION_API_KEY || "evolution_secret_key_v1",
-    selectedInstanceName: "vendas",
-    isConnected: true,
-    lastTestedAt: new Date().toISOString(),
-    lastSyncedAt: new Date().toISOString(),
-    instances: defaultInstances,
-  };
+  if (persisted) {
+    global.__BOT_CONVERSA_CHANNEL_CONFIG__ = persisted;
+  } else {
+    const defaultInstances: InstanceInfo[] = [
+      {
+        id: "inst_default",
+        name: "default",
+        status: "open",
+        number: "5535999999999",
+        profileName: "Atendimento",
+        profilePictureUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80",
+        updatedAt: new Date().toISOString(),
+        webhookUrl: "http://localhost:3000/api/webhooks/evolution",
+        webhookEnabled: true,
+        isDefault: true,
+      },
+    ];
+
+    global.__BOT_CONVERSA_CHANNEL_CONFIG__ = {
+      id: "cfg_evolution_main",
+      provider: "evolution",
+      baseUrl: process.env.NEXT_PUBLIC_EVOLUTION_API_URL || "http://localhost:8080",
+      apiKey: process.env.EVOLUTION_API_KEY || "",
+      selectedInstanceName: process.env.EVOLUTION_INSTANCE_NAME || "default",
+      isConnected: true,
+      lastTestedAt: new Date().toISOString(),
+      lastSyncedAt: new Date().toISOString(),
+      instances: defaultInstances,
+    };
+
+    savePersistedConfig(global.__BOT_CONVERSA_CHANNEL_CONFIG__);
+  }
 }
 
 export class ChannelRepository {
@@ -71,6 +99,7 @@ export class ChannelRepository {
 
   public async updateConfig(updates: Partial<ChannelConfig>): Promise<ChannelConfig> {
     Object.assign(this.config, updates);
+    savePersistedConfig(this.config);
     return { ...this.config };
   }
 
@@ -95,6 +124,7 @@ export class ChannelRepository {
     }));
     this.config.instances = mapped;
     this.config.lastSyncedAt = new Date().toISOString();
+    savePersistedConfig(this.config);
   }
 
   public async selectInstance(instanceName: string): Promise<InstanceInfo | null> {
@@ -107,6 +137,7 @@ export class ChannelRepository {
       isDefault: i.name === instanceName,
     }));
 
+    savePersistedConfig(this.config);
     return target;
   }
 
@@ -131,6 +162,7 @@ export class ChannelRepository {
       inst.webhookUrl = webhookUrl;
       inst.webhookEnabled = webhookEnabled;
       inst.updatedAt = new Date().toISOString();
+      savePersistedConfig(this.config);
     }
   }
 }

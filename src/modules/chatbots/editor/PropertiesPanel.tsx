@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { MediaUploadZone } from "@/components/ui/media-upload-zone";
 import { X, Plus, Trash2, Variable } from "lucide-react";
 import { NODE_CONFIG } from "@/modules/shared/constants";
 import { generateId } from "@/modules/shared/utils";
@@ -132,11 +133,28 @@ export function PropertiesPanel({
             />
 
             {data.messageType !== "text" && (
-              <Input
-                label="URL da Mídia (HTTPS)"
-                value={data.mediaUrl || ""}
-                onChange={(e) => update({ mediaUrl: e.target.value })}
-                placeholder="https://exemplo.com/arquivo.jpg"
+              <MediaUploadZone
+                mediaType={data.messageType as any}
+                mediaUrl={data.mediaUrl}
+                fileName={data.fileName}
+                fileSize={data.fileSize}
+                mimeType={data.mimeType}
+                onChange={(uploaded) =>
+                  update({
+                    mediaUrl: uploaded.mediaUrl,
+                    fileName: uploaded.fileName,
+                    fileSize: uploaded.fileSize,
+                    mimeType: uploaded.mimeType,
+                  })
+                }
+                onClear={() =>
+                  update({
+                    mediaUrl: "",
+                    fileName: "",
+                    fileSize: undefined,
+                    mimeType: undefined,
+                  })
+                }
               />
             )}
 

@@ -74,10 +74,72 @@ export const MessageNode = memo(({ data, selected }: NodeProps) => {
         {renderPreview(nodeData.content)}
       </div>
 
+      {/* Media preview */}
       {nodeData.mediaUrl && (
-        <p className="mt-1.5 truncate text-[10px] text-muted-foreground font-mono">
-          🔗 {nodeData.mediaUrl}
-        </p>
+        <div className="mt-2 rounded-lg overflow-hidden border border-border/50 bg-[#08090d]">
+          {messageType === "image" && (
+            <div className="relative group">
+              <img
+                src={nodeData.mediaUrl}
+                alt={nodeData.content || "Imagem do fluxo"}
+                className="w-full h-24 object-cover"
+                onError={(e) => {
+                  (e.target as HTMLElement).style.display = "none";
+                }}
+              />
+              <div className="p-1.5 flex items-center justify-between text-[10px] text-muted-foreground bg-[#0f1016]">
+                <span className="truncate max-w-[180px]">
+                  {nodeData.mediaUrl.split("/").pop()}
+                </span>
+                <span className="text-emerald-400 font-mono text-[9px]">imagem</span>
+              </div>
+            </div>
+          )}
+
+          {messageType === "audio" && (
+            <div className="p-2 flex items-center gap-2">
+              <div className="h-7 w-7 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                <Mic className="h-3.5 w-3.5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-slate-200 truncate">
+                  {nodeData.mediaUrl.split("/").pop() || "audio.ogg"}
+                </p>
+                <p className="text-[9px] text-muted-foreground">
+                  Áudio WhatsApp (PTT / Voice Note)
+                </p>
+              </div>
+            </div>
+          )}
+
+          {messageType === "video" && (
+            <div className="p-2 flex items-center gap-2">
+              <div className="h-7 w-7 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center shrink-0">
+                <Film className="h-3.5 w-3.5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-slate-200 truncate">
+                  {nodeData.mediaUrl.split("/").pop() || "video.mp4"}
+                </p>
+                <p className="text-[9px] text-muted-foreground">Vídeo MP4</p>
+              </div>
+            </div>
+          )}
+
+          {messageType === "document" && (
+            <div className="p-2 flex items-center gap-2">
+              <div className="h-7 w-7 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+                <FileText className="h-3.5 w-3.5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-slate-200 truncate">
+                  {nodeData.mediaUrl.split("/").pop() || "documento"}
+                </p>
+                <p className="text-[9px] text-muted-foreground">Documento anexo</p>
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {/* Output Handle */}

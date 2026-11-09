@@ -3,7 +3,7 @@ import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FlowData } from "../types";
-import { Send, Bot, User, CheckCircle2, Tag, Binary, RefreshCw } from "lucide-react";
+import { Send, Bot, User, CheckCircle2, Tag, Binary, RefreshCw, FileText, Film, Mic, Image } from "lucide-react";
 
 interface SimulatorModalProps {
   isOpen: boolean;
@@ -178,12 +178,53 @@ export function SimulatorModal({ isOpen, onClose, flowData }: SimulatorModalProp
                     </div>
                   )}
                   <div
-                    className={`max-w-[80%] rounded-2xl px-3.5 py-2 text-xs shadow-sm ${
+                    className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-xs shadow-sm ${
                       m.sender === "user"
                         ? "rounded-br-none bg-emerald-600 text-white"
                         : "rounded-bl-none bg-[#1a1d28] text-foreground border border-border/60"
                     }`}
                   >
+                    {/* Media render */}
+                    {m.mediaUrl && (
+                      <div className="mb-2 rounded-lg overflow-hidden border border-border/40 bg-black/30">
+                        {m.mediaType === "image" && (
+                          <img
+                            src={m.mediaUrl}
+                            alt="Mídia"
+                            className="max-h-48 w-full object-cover rounded"
+                          />
+                        )}
+                        {m.mediaType === "audio" && (
+                          <div className="p-2 space-y-1">
+                            <div className="flex items-center gap-1.5 text-[10px] text-emerald-400 font-medium">
+                              <Mic className="h-3 w-3" />
+                              <span>Mensagem de Voz WhatsApp</span>
+                            </div>
+                            <audio controls src={m.mediaUrl} className="w-full h-8" />
+                          </div>
+                        )}
+                        {m.mediaType === "video" && (
+                          <video
+                            controls
+                            src={m.mediaUrl}
+                            className="max-h-48 w-full rounded"
+                          />
+                        )}
+                        {m.mediaType === "document" && (
+                          <div className="p-2 flex items-center gap-2">
+                            <FileText className="h-4 w-4 text-amber-400" />
+                            <a
+                              href={m.mediaUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-xs text-indigo-400 underline truncate hover:text-indigo-300"
+                            >
+                              {m.mediaUrl.split("/").pop()}
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    )}
                     <p className="whitespace-pre-wrap leading-relaxed">{m.text}</p>
                     <span
                       className={`block text-[9px] mt-1 text-right ${

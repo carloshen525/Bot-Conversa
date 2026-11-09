@@ -1,3 +1,5 @@
+import fs from "fs";
+import path from "path";
 import {
   WhatsAppProvider,
   InstanceInfo,
@@ -438,9 +440,25 @@ export class EvolutionProvider implements WhatsAppProvider {
     const clean = this.cleanUrl(baseUrl);
     const instance = (params.instanceName || "default").trim();
     const encodedInstance = encodeURIComponent(instance);
-    const endpoint = `${clean}/message/sendMedia/${encodedInstance}`;
-
     const cleanNumber = params.number.replace(/\D/g, "");
+
+    // Resolve local file to Base64 so Evolution API in the cloud does not need external URL hosting
+    let mediaPayload = params.media;
+    if (params.media && params.media.startsWith("/uploads/")) {
+      try {
+        const localPath = path.join(process.cwd(), "public", params.media);
+        if (fs.existsSync(localPath)) {
+          const fileBuffer = fs.readFileSync(localPath);
+          // Evolution API requires pure Base64 without data URI scheme
+          mediaPayload = fileBuffer.toString("base64");
+        }
+      } catch (e: any) {
+        console.warn("[EvolutionProvider] Error reading local file for base64:", e.message);
+      }
+    } else if (mediaPayload && mediaPayload.startsWith("data:") && mediaPayload.includes(";base64,")) {
+      // Strip Data URI prefix if present as Evolution API expects pure Base64
+      mediaPayload = mediaPayload.split(";base64,")[1];
+    }
 
     // Mock
     if (clean.includes("localhost:8080") || apiKey.includes("test") || apiKey.includes("secret")) {
@@ -449,15 +467,36 @@ export class EvolutionProvider implements WhatsAppProvider {
     }
 
     try {
+      // 1. If audio, try sendWhatsAppAudio first for native WhatsApp voice note recording
+      if (params.mediatype === "audio") {
+        const audioEndpoint = `${clean}/message/sendWhatsAppAudio/${encodedInstance}`;
+        const audioResponse = await this.fetchWithTimeout(audioEndpoint, {
+          method: "POST",
+          headers: this.getHeaders(apiKey),
+          body: JSON.stringify({
+            number: cleanNumber,
+            audio: mediaPayload,
+            delay: (params.delay || 1) * 1000,
+          }),
+        });
+
+        if (audioResponse.ok) {
+          const json = await audioResponse.json();
+          return { success: true, data: json, messageId: json?.key?.id };
+        }
+      }
+
+      // 2. Standard sendMedia endpoint
+      const endpoint = `${clean}/message/sendMedia/${encodedInstance}`;
       const response = await this.fetchWithTimeout(endpoint, {
         method: "POST",
         headers: this.getHeaders(apiKey),
         body: JSON.stringify({
           number: cleanNumber,
           mediatype: params.mediatype,
-          media: params.media,
+          media: mediaPayload,
           caption: params.caption || "",
-          fileName: params.fileName,
+          fileName: params.fileName || `arquivo_${Date.now()}`,
           delay: (params.delay || 1) * 1000,
         }),
       });
