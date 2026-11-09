@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Providers } from "@/components/providers";
 import { Sidebar } from "@/components/layout/sidebar";
+import { TopHeader } from "@/components/layout/TopHeader";
 
 export const metadata: Metadata = {
   title: "Bot Conversa - Plataforma de Chatbots Visuais",
@@ -19,6 +20,7 @@ export default function RootLayout({
         <Providers>
           <Sidebar />
           <main className="flex-1 min-w-0 flex flex-col h-screen overflow-y-auto">
+            <TopHeader />
             {children}
           </main>
         </Providers>

@@ -133,3 +133,62 @@ create index if not exists idx_executions_contact on public.executions(contact_i
 create index if not exists idx_chatbot_versions_chatbot on public.chatbot_versions(chatbot_id);
 create index if not exists idx_logs_execution on public.logs(execution_id);
 create index if not exists idx_logs_conversation on public.logs(conversation_state_id);
+
+-- ==============================================================================
+-- 11. PROFILES TABLE (Supabase Auth Integration & Role Permissions)
+-- ==============================================================================
+create table if not exists public.profiles (
+    id uuid primary key default uuid_generate_v4(),
+    auth_user_id uuid references auth.users(id) on delete cascade unique not null,
+    nome text not null,
+    email text not null,
+    avatar text default '',
+    role text not null default 'admin' check (role in ('admin', 'operador', 'atendimento', 'gestor')),
+    created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+    updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+create index if not exists idx_profiles_auth_user on public.profiles(auth_user_id);
+create index if not exists idx_profiles_email on public.profiles(email);
+
+-- Trigger to automatically create a profile when a new user is created in Supabase Auth
+create or replace function public.handle_new_user()
+returns trigger as $$
+begin
+  insert into public.profiles (auth_user_id, nome, email, avatar, role)
+  values (
+    new.id,
+    coalesce(new.raw_user_meta_data->>'nome', split_part(new.email, '@', 1)),
+    new.email,
+    coalesce(new.raw_user_meta_data->>'avatar', ''),
+    coalesce(new.raw_user_meta_data->>'role', 'admin')
+  )
+  on conflict (auth_user_id) do update set
+    email = excluded.email,
+    updated_at = now();
+  return new;
+end;
+$$ language plpgsql security definer;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function public.handle_new_user();
+
+-- Enable Row Level Security (RLS)
+alter table public.profiles enable row level security;
+
+-- Policies for profiles
+create policy "Users can view their own profile or admins can view all"
+  on public.profiles for select
+  using (
+    auth.uid() = auth_user_id
+    or exists (
+      select 1 from public.profiles where auth_user_id = auth.uid() and role = 'admin'
+    )
+  );
+
+create policy "Users can update their own profile"
+  on public.profiles for update
+  using (auth.uid() = auth_user_id);
+

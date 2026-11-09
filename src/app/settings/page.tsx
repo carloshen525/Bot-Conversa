@@ -16,6 +16,7 @@ import {
   ChevronRight,
   Globe,
   Zap,
+  ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -263,22 +264,37 @@ export default function SettingsPage() {
         <CardHeader>
           <div className="flex items-center gap-2">
             <Database className="h-4 w-4 text-cyan-400" />
-            <CardTitle>Banco de Dados Supabase (Schema V1)</CardTitle>
+            <CardTitle>Supabase Auth & Banco de Dados (Schema V1)</CardTitle>
           </div>
           <CardDescription>
-            Tabelas configuradas: chatbots, chatbot_drafts, chatbot_versions, contacts, conversation_state, executions, variables, tags, contact_tags, logs.
+            Autenticação oficial via Supabase Auth. Tabelas: profiles, chatbots, chatbot_drafts, chatbot_versions, contacts, conversation_state, executions, variables, tags, contact_tags, logs.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-xs text-muted-foreground">
-            O arquivo SQL completo de migração está salvo em <code className="text-cyan-300 font-mono">supabase/schema.sql</code> no projeto. Ele inclui chaves estrangeiras, índices e restrições para suportar snapshots imutáveis.
+            O arquivo SQL completo de migração está salvo em <code className="text-cyan-300 font-mono">supabase/schema.sql</code> no projeto. Ele inclui a tabela <code className="text-cyan-300 font-mono">profiles</code> com trigger automático para novos usuários de <code className="text-cyan-300 font-mono">auth.users</code>, chaves estrangeiras, índices e restrições.
           </p>
-          <div className="flex items-center gap-2">
+          <div className="rounded-lg bg-[#0c0d12] border border-border/60 p-3 space-y-1.5 text-xs">
+            <p className="font-semibold text-foreground flex items-center gap-1.5">
+              <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+              Como Cadastrar Novos Usuários (Sem Cadastro Público):
+            </p>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              1. Acesse o painel do seu Supabase → <strong>Authentication</strong> → <strong>Users</strong>.
+            </p>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              2. Clique em <strong>Add User</strong> → <strong>Create User</strong> e insira o e-mail e senha do operador/gestor.
+            </p>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              3. O trigger automático criará o registro na tabela <code>profiles</code> com o cargo (role) correspondente.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 pt-1">
             <span className="rounded bg-emerald-500/10 text-emerald-400 px-2 py-1 text-xs font-medium">
-              ✓ Schema Pronto para Produção
+              ✓ Supabase Auth Ativo
             </span>
             <span className="rounded bg-indigo-500/10 text-indigo-400 px-2 py-1 text-xs font-medium">
-              ✓ Armazenamento Resiliente com Fallback Local Ativo
+              ✓ Sessões Seguras com Cookies SSR
             </span>
           </div>
         </CardContent>

@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -11,8 +11,13 @@ import {
   Zap,
   Activity,
   Layers,
+  User,
+  LogOut,
+  Shield,
 } from "lucide-react";
 import { cn } from "@/modules/shared/utils";
+import { useAuth } from "@/modules/auth/AuthContext";
+import { ProfileModal } from "./ProfileModal";
 
 const NAV_ITEMS = [
   {
@@ -40,9 +45,14 @@ const NAV_ITEMS = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { profile, signOut, isAdmin, role } = useAuth();
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
-  // Hide global sidebar when inside visual flow editor for maximum canvas space
-  if (pathname.startsWith("/chatbots/") && pathname !== "/chatbots") {
+  // Hide global sidebar when inside login screen or visual flow editor
+  if (
+    pathname === "/login" ||
+    (pathname.startsWith("/chatbots/") && pathname !== "/chatbots")
+  ) {
     return null;
   }
 
@@ -142,6 +152,52 @@ export function Sidebar() {
           </p>
         </div>
       </div>
+
+      {/* User Profile & Logout */}
+      <div className="p-3 border-t border-border/70 space-y-2 bg-[#0d0f15]/80">
+        <div className="flex items-center justify-between gap-2 px-1">
+          <div className="flex items-center gap-2.5 min-w-0">
+            {profile?.avatar ? (
+              <img
+                src={profile.avatar}
+                alt={profile.nome}
+                className="h-8 w-8 rounded-full object-cover border border-border shrink-0"
+              />
+            ) : (
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-600/20 text-indigo-300 font-bold text-xs border border-indigo-500/30 shrink-0">
+                {(profile?.nome || "Carlos Henrique").slice(0, 2).toUpperCase()}
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold text-foreground truncate">
+                {profile?.nome || "Carlos Henrique"}
+              </p>
+              <p className="text-[10px] text-muted-foreground truncate">
+                {profile?.email || "carloshenrq1245@gmail.com"}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-1 pt-1">
+          <button
+            onClick={() => setIsProfileOpen(true)}
+            className="flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-[11px] font-medium text-slate-300 hover:bg-white/5 hover:text-white border border-border/50 transition-colors"
+          >
+            <User className="h-3 w-3 text-muted-foreground" />
+            <span>Meu Perfil</span>
+          </button>
+          <button
+            onClick={() => signOut()}
+            className="flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-[11px] font-medium text-rose-400 hover:bg-rose-500/10 border border-border/50 transition-colors"
+          >
+            <LogOut className="h-3 w-3" />
+            <span>Sair</span>
+          </button>
+        </div>
+      </div>
+
+      <ProfileModal isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} />
     </aside>
   );
 }
