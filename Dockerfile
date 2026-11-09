@@ -29,6 +29,10 @@ ENV HOSTNAME="0.0.0.0"
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
+# Create runtime directories with full permissions for the application user
+RUN mkdir -p /app/data /app/public/uploads/media \
+    && chown -R nextjs:nodejs /app/data /app/public
+
 COPY --from=builder /app/public ./public
 
 # Automatically leverage output traces to reduce image size
