@@ -14,7 +14,7 @@ import {
 
 export class EvolutionProvider implements WhatsAppProvider {
   public readonly name = "evolution";
-  private timeoutMs = 8000;
+  private timeoutMs = 60000;
 
   private cleanUrl(rawUrl: string): string {
     return rawUrl.trim().replace(/\/+$/, "");
