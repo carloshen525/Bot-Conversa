@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { contactsService } from "@/modules/contacts/contacts.service";
 
-export async function POST(
-  _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+interface RouteParams {
+  params: { id: string };
+}
+
+export async function POST(_req: NextRequest, { params }: RouteParams) {
   try {
-    const { id } = await params;
+    const id = params?.id;
     const stopped = await contactsService.stopFlow(id);
 
     if (!stopped) {

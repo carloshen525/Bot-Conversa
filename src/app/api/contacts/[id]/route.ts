@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { contactsService } from "@/modules/contacts/contacts.service";
 import { contactsRepository } from "@/modules/contacts/contacts.repository";
 
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+interface RouteParams {
+  params: { id: string };
+}
+
+export async function GET(_req: NextRequest, { params }: RouteParams) {
   try {
-    const { id } = await params;
+    const id = params?.id;
     const contact = await contactsService.getContactById(id);
     if (!contact) {
       return NextResponse.json(
@@ -24,12 +25,9 @@ export async function GET(
   }
 }
 
-export async function PUT(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PUT(req: NextRequest, { params }: RouteParams) {
   try {
-    const { id } = await params;
+    const id = params?.id;
     const body = await req.json();
 
     const contact = await contactsService.getContactById(id);
@@ -67,12 +65,9 @@ export async function PUT(
   }
 }
 
-export async function DELETE(
-  _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function DELETE(_req: NextRequest, { params }: RouteParams) {
   try {
-    const { id } = await params;
+    const id = params?.id;
     const success = await contactsRepository.delete(id);
     return NextResponse.json({ success });
   } catch (err: any) {

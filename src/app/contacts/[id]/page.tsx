@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect, useState, use } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import {
   ArrowLeft,
   Phone,
@@ -56,13 +57,9 @@ interface PublishedBot {
   current_published_version_id?: string;
 }
 
-export default function ContactDetailsPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const resolvedParams = use(params);
-  const contactId = resolvedParams.id;
+export default function ContactDetailsPage() {
+  const routeParams = useParams();
+  const contactId = (routeParams?.id as string) || "";
 
   const [contact, setContact] = useState<Contact | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
