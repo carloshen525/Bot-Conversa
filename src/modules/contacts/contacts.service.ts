@@ -275,6 +275,14 @@ export class ContactsService {
           continue;
         }
 
+        // Check if phone was an unresolved temporary LID
+        if (cleanPhone.length > 13 || (!cleanPhone.startsWith("55") && cleanPhone.length > 11)) {
+          errors.push(
+            `O contato ${contact.name} (${contact.phone}) ainda possui um identificador provisório (LID). Clique em "Sincronizar Contatos" no topo da página para carregar o número de WhatsApp real.`
+          );
+          continue;
+        }
+
         // Legacy contact record
         const legacyContact = await legacyContactRepo.getOrCreate(cleanPhone, contact.name);
 
@@ -349,7 +357,9 @@ export class ContactsService {
         );
 
         // Dispatch initial messages via Evolution API to the clean phone number
-        const instanceName = contact.instance_name || "Carlos1";
+        const channelCfg = await channelRepository.getConfig();
+        const activeInst = await channelRepository.getActiveInstance();
+        const instanceName = (contact.instance_name || activeInst?.name || channelCfg.selectedInstanceName || "Carlos1").trim();
         for (const action of result.dispatchedActions) {
           if (action.type === "send_text_message") {
             const sendRes = await this.evolutionClient.sendTextMessage({

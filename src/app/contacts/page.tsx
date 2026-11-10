@@ -227,9 +227,10 @@ export default function ContactsPage() {
         setSelectedIds(new Set());
         await loadData(true);
       } else {
+        const errorDetail = data.error || data.data?.errors?.join("; ") || "Falha ao iniciar fluxo.";
         setNotification({
           type: "error",
-          text: data.error || "Falha ao iniciar fluxo.",
+          text: errorDetail,
         });
       }
     } catch (err: any) {

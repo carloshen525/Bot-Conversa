@@ -26,10 +26,18 @@ export async function POST(req: NextRequest) {
       policy: policy === "keep" ? "keep" : "replace",
     });
 
+    const errorDetail =
+      result.errors && result.errors.length > 0
+        ? result.errors.join("; ")
+        : result.dispatchedCount === 0
+        ? "Nenhuma mensagem pôde ser enviada para os contatos selecionados."
+        : undefined;
+
     return NextResponse.json({
-      success: result.success,
+      success: result.success && result.dispatchedCount > 0,
       data: result,
       message: `Fluxo iniciado para ${result.dispatchedCount} contato(s).`,
+      error: errorDetail,
     });
   } catch (err: any) {
     return NextResponse.json(

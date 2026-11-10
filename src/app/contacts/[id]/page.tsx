@@ -214,7 +214,8 @@ export default function ContactDetailsPage() {
         setFeedback({ type: "success", text: "Fluxo iniciado com sucesso para o contato!" });
         await loadData(true);
       } else {
-        alert(json.error || "Falha ao iniciar fluxo.");
+        const errorDetail = json.error || json.data?.errors?.join("; ") || "Falha ao iniciar fluxo.";
+        setFeedback({ type: "error", text: errorDetail });
       }
     } catch (err: any) {
       alert(`Erro: ${err.message}`);
