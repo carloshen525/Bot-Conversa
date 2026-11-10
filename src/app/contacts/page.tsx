@@ -23,7 +23,7 @@ import {
   X,
 } from "lucide-react";
 import { Loading } from "@/components/ui/loading";
-import { formatRelativeTime } from "@/modules/shared/utils";
+import { formatRelativeTime, formatPhone } from "@/modules/shared/utils";
 
 interface Contact {
   id: string;
@@ -493,7 +493,7 @@ export default function ContactsPage() {
                               {contact.name}
                             </div>
                             <div className="text-[11px] text-muted-foreground font-mono">
-                              +{contact.phone}
+                              {formatPhone(contact.phone)}
                             </div>
                           </div>
                         </Link>

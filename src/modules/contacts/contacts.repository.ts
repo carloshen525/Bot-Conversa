@@ -214,6 +214,22 @@ export class ContactsRepository {
     savePersistedData(this.store);
     return true;
   }
+
+  public purgeInvalidLids(): number {
+    let purged = 0;
+    for (const [phone] of Array.from(this.store.entries())) {
+      // Discard WhatsApp internal LIDs (typically 14-16 digits not starting with standard phone formats)
+      const isLid = phone.length > 13 || (!phone.startsWith("55") && phone.length > 11);
+      if (isLid) {
+        this.store.delete(phone);
+        purged++;
+      }
+    }
+    if (purged > 0) {
+      savePersistedData(this.store);
+    }
+    return purged;
+  }
 }
 
 export const contactsRepository = new ContactsRepository();

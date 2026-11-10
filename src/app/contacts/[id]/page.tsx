@@ -24,7 +24,7 @@ import {
   X,
 } from "lucide-react";
 import { Loading } from "@/components/ui/loading";
-import { formatDate, formatRelativeTime } from "@/modules/shared/utils";
+import { formatDate, formatRelativeTime, formatPhone } from "@/modules/shared/utils";
 
 interface Contact {
   id: string;
@@ -353,7 +353,7 @@ export default function ContactDetailsPage() {
 
               <div className="flex flex-wrap items-center gap-4 mt-1.5 text-xs text-muted-foreground font-mono">
                 <span className="flex items-center gap-1">
-                  <Phone className="h-3.5 w-3.5 text-indigo-400" />+{contact.phone}
+                  <Phone className="h-3.5 w-3.5 text-indigo-400" />{formatPhone(contact.phone)}
                 </span>
                 <span>•</span>
                 <span>Instância: {contact.instance_name || "Carlos1"}</span>

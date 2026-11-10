@@ -35,3 +35,18 @@ export function formatRelativeTime(dateStr?: string | Date | null): string {
   if (diffInSeconds < 604800) return `há ${Math.floor(diffInSeconds / 86400)} dias`;
   return formatDate(date);
 }
+
+export function formatPhone(phone?: string | null): string {
+  if (!phone) return "-";
+  const clean = phone.replace(/\D/g, "");
+  if (clean.startsWith("55") && (clean.length === 12 || clean.length === 13)) {
+    const ddd = clean.slice(2, 4);
+    const rest = clean.slice(4);
+    if (rest.length === 9) {
+      return `+55 (${ddd}) ${rest.slice(0, 5)}-${rest.slice(5)}`;
+    } else {
+      return `+55 (${ddd}) ${rest.slice(0, 4)}-${rest.slice(4)}`;
+    }
+  }
+  return `+${clean}`;
+}

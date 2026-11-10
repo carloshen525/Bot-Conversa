@@ -55,98 +55,174 @@ export class ContactsService {
   }
 
   /**
-   * Synchronize all contacts with the Evolution API chats
+   * Synchronize all contacts with the Evolution API
+   * Extracts real phone numbers (filtering out raw WhatsApp @lid and groups)
    */
   public async syncFromEvolution(targetInstanceName?: string): Promise<SyncContactsResult> {
+    // 1. Clean up any invalid/ephemeral WhatsApp LIDs that might have been stored previously
+    contactsRepository.purgeInvalidLids();
+
     const config = await channelRepository.getConfig();
     const activeInstance = await channelRepository.getActiveInstance();
     const instanceName = targetInstanceName || activeInstance?.name || config.selectedInstanceName || "Carlos1";
 
     const cleanBaseUrl = config.baseUrl.trim().replace(/\/+$/, "");
-    const endpoint = `${cleanBaseUrl}/chat/findChats/${encodeURIComponent(instanceName)}`;
+    const apiKey = config.apiKey.trim();
 
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: config.apiKey.trim(),
-      },
-      body: JSON.stringify({}),
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Falha ao sincronizar contatos da Evolution API: ${errText}`);
-    }
-
-    const chats: any[] = await response.json();
     let totalSynced = 0;
     let newContacts = 0;
     let updatedContacts = 0;
 
-    for (const chat of chats) {
-      const remoteJid = chat.remoteJid || chat.id || "";
-      // Filter out groups (@g.us) and broadcast lists (@broadcast)
-      if (!remoteJid || remoteJid.includes("@g.us") || remoteJid.includes("@broadcast")) {
-        continue;
-      }
-
-      const cleanPhone = remoteJid.replace("@s.whatsapp.net", "").replace(/\D/g, "");
-      if (!cleanPhone || cleanPhone.length < 8) continue;
-
-      // Extract last message text snippet
-      let lastMsgText = "";
-      let lastMsgFromMe = false;
-      let lastMsgTimestamp = chat.updatedAt || new Date().toISOString();
-
-      if (chat.lastMessage) {
-        const lm = chat.lastMessage;
-        lastMsgFromMe = Boolean(lm.key?.fromMe);
-        if (lm.messageTimestamp) {
-          lastMsgTimestamp = new Date(lm.messageTimestamp * 1000).toISOString();
+    // 2. Fetch all real phone contacts from Evolution API (/chat/findContacts)
+    try {
+      const contactsRes = await fetch(
+        `${cleanBaseUrl}/chat/findContacts/${encodeURIComponent(instanceName)}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: apiKey,
+          },
+          body: JSON.stringify({}),
         }
+      );
 
-        const msgContent = lm.message;
-        if (msgContent) {
-          lastMsgText =
-            msgContent.conversation ||
-            msgContent.extendedTextMessage?.text ||
-            msgContent.imageMessage?.caption ||
-            msgContent.videoMessage?.caption ||
-            msgContent.documentMessage?.caption ||
-            (lm.messageType === "audioMessage" ? "🎵 Áudio" : "") ||
-            (lm.messageType === "imageMessage" ? "📷 Foto" : "") ||
-            (lm.messageType === "videoMessage" ? "🎥 Vídeo" : "") ||
-            (lm.messageType === "documentMessage" ? "📄 Documento" : "") ||
-            "";
+      if (contactsRes.ok) {
+        const contactsData: any[] = await contactsRes.json();
+        for (const item of contactsData) {
+          if (item.isGroup || item.type === "group") continue;
+
+          const remoteJid = String(item.remoteJid || item.id || "");
+          if (!remoteJid.includes("@s.whatsapp.net") || remoteJid.startsWith("0@")) continue;
+
+          const cleanPhone = remoteJid.replace("@s.whatsapp.net", "").replace(/\D/g, "");
+          // Valid phone numbers are strictly between 10 and 13 digits
+          if (cleanPhone.length < 10 || cleanPhone.length > 13) continue;
+
+          const existing = await contactsRepository.findByPhone(cleanPhone);
+          const isNew = !existing;
+
+          const contactName =
+            item.pushName || item.name || existing?.name || `WhatsApp ${cleanPhone.slice(-4)}`;
+
+          await contactsRepository.upsert({
+            phone: cleanPhone,
+            name: contactName,
+            profile_pic_url: item.profilePicUrl || existing?.profile_pic_url,
+            instance_name: instanceName,
+          });
+
+          await legacyContactRepo.getOrCreate(cleanPhone, contactName);
+
+          totalSynced++;
+          if (isNew) newContacts++;
+          else updatedContacts++;
         }
       }
+    } catch (err: any) {
+      console.warn("[ContactsService] findContacts warning:", err.message);
+    }
 
-      const existing = await contactsRepository.findByPhone(cleanPhone);
-      const isNew = !existing;
+    // 3. Fetch all chats to update last message snippets and interaction timestamps
+    try {
+      const chatsRes = await fetch(
+        `${cleanBaseUrl}/chat/findChats/${encodeURIComponent(instanceName)}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: apiKey,
+          },
+          body: JSON.stringify({}),
+        }
+      );
 
-      await contactsRepository.upsert({
-        phone: cleanPhone,
-        name: chat.pushName || existing?.name || `WhatsApp ${cleanPhone.slice(-4)}`,
-        profile_pic_url: chat.profilePicUrl || existing?.profile_pic_url,
-        last_message: lastMsgText || existing?.last_message,
-        last_message_at: lastMsgTimestamp || existing?.last_message_at,
-        last_message_from_me: lastMsgFromMe,
-        instance_name: instanceName,
-      });
+      if (chatsRes.ok) {
+        const chats: any[] = await chatsRes.json();
+        for (const chat of chats) {
+          const rawJid = String(chat.remoteJid || chat.id || "");
+          if (rawJid.includes("@g.us") || rawJid.includes("@broadcast")) continue;
 
-      // Keep legacy repository in sync for flow-engine lookups
-      await legacyContactRepo.getOrCreate(cleanPhone, chat.pushName || existing?.name);
+          // Resolve real phone number from @s.whatsapp.net or remoteJidAlt
+          let cleanPhone = "";
+          if (rawJid.includes("@s.whatsapp.net")) {
+            cleanPhone = rawJid.replace("@s.whatsapp.net", "").replace(/\D/g, "");
+          } else if (
+            chat.lastMessage?.key?.remoteJidAlt &&
+            chat.lastMessage.key.remoteJidAlt.includes("@s.whatsapp.net")
+          ) {
+            cleanPhone = chat.lastMessage.key.remoteJidAlt
+              .replace("@s.whatsapp.net", "")
+              .replace(/\D/g, "");
+          }
 
-      totalSynced++;
-      if (isNew) newContacts++;
-      else updatedContacts++;
+          // Discard raw WhatsApp LIDs that don't have a verified real phone number
+          if (!cleanPhone || cleanPhone.length < 10 || cleanPhone.length > 13) {
+            continue;
+          }
+
+          // Extract last message text snippet
+          let lastMsgText = "";
+          let lastMsgFromMe = false;
+          let lastMsgTimestamp = chat.updatedAt || new Date().toISOString();
+
+          if (chat.lastMessage) {
+            const lm = chat.lastMessage;
+            lastMsgFromMe = Boolean(lm.key?.fromMe);
+            if (lm.messageTimestamp) {
+              lastMsgTimestamp = new Date(lm.messageTimestamp * 1000).toISOString();
+            }
+
+            const msgContent = lm.message;
+            if (msgContent) {
+              lastMsgText =
+                msgContent.conversation ||
+                msgContent.extendedTextMessage?.text ||
+                msgContent.imageMessage?.caption ||
+                msgContent.videoMessage?.caption ||
+                msgContent.documentMessage?.caption ||
+                (lm.messageType === "audioMessage" ? "🎵 Áudio" : "") ||
+                (lm.messageType === "imageMessage" ? "📷 Foto" : "") ||
+                (lm.messageType === "videoMessage" ? "🎥 Vídeo" : "") ||
+                (lm.messageType === "documentMessage" ? "📄 Documento" : "") ||
+                "";
+            }
+          }
+
+          const existing = await contactsRepository.findByPhone(cleanPhone);
+          const isNew = !existing;
+
+          const contactName =
+            chat.pushName || existing?.name || `WhatsApp ${cleanPhone.slice(-4)}`;
+
+          await contactsRepository.upsert({
+            phone: cleanPhone,
+            name: contactName,
+            profile_pic_url: chat.profilePicUrl || existing?.profile_pic_url,
+            last_message: lastMsgText || existing?.last_message,
+            last_message_at: lastMsgTimestamp || existing?.last_message_at,
+            last_message_from_me: lastMsgFromMe,
+            instance_name: instanceName,
+          });
+
+          await legacyContactRepo.getOrCreate(cleanPhone, contactName);
+
+          if (isNew) {
+            totalSynced++;
+            newContacts++;
+          } else {
+            updatedContacts++;
+          }
+        }
+      }
+    } catch (err: any) {
+      console.warn("[ContactsService] findChats warning:", err.message);
     }
 
     await logRepository.insert({
       level: "info",
       node_id: "contacts",
-      message: `Sincronização de contatos concluída: ${totalSynced} contatos processados (${newContacts} novos, ${updatedContacts} atualizados).`,
+      message: `Sincronização de contatos concluída: ${totalSynced} contatos válidos processados (${newContacts} novos, ${updatedContacts} atualizados).`,
       details: { instanceName, totalSynced, newContacts, updatedContacts },
     });
 
@@ -193,8 +269,14 @@ export class ContactsService {
         const contact = await contactsRepository.findById(contactId);
         if (!contact) continue;
 
+        const cleanPhone = contact.phone.replace(/\D/g, "");
+        if (!cleanPhone || cleanPhone.length < 10) {
+          errors.push(`Número de telefone inválido para o contato ${contact.name}`);
+          continue;
+        }
+
         // Legacy contact record
-        const legacyContact = await legacyContactRepo.getOrCreate(contact.phone, contact.name);
+        const legacyContact = await legacyContactRepo.getOrCreate(cleanPhone, contact.name);
 
         // Check existing state
         const existingState = await executionRepository.findActiveStateByContact(legacyContact.id);
@@ -248,7 +330,7 @@ export class ContactsService {
         const contactData: ContactData = {
           id: legacyContact.id,
           name: contact.name,
-          phone: contact.phone,
+          phone: cleanPhone,
           tags: contact.tags,
           variables: contact.variables,
         };
@@ -266,19 +348,24 @@ export class ContactsService {
           triggerEvent
         );
 
-        // Dispatch initial messages via Evolution API
+        // Dispatch initial messages via Evolution API to the clean phone number
         const instanceName = contact.instance_name || "Carlos1";
         for (const action of result.dispatchedActions) {
           if (action.type === "send_text_message") {
-            await this.evolutionClient.sendTextMessage({
-              number: contact.phone,
+            const sendRes = await this.evolutionClient.sendTextMessage({
+              number: cleanPhone,
               text: String(action.payload.text || ""),
               delay: Number(action.payload.delaySeconds || 1),
               instanceName,
             });
+            if (!sendRes.success) {
+              const errMsg = `Falha ao enviar mensagem para ${contact.name} (${cleanPhone}): ${sendRes.error}`;
+              console.error("[ContactsService]", errMsg);
+              errors.push(errMsg);
+            }
           } else if (action.type === "send_media_message") {
-            await this.evolutionClient.sendMediaMessage({
-              number: contact.phone,
+            const sendRes = await this.evolutionClient.sendMediaMessage({
+              number: cleanPhone,
               mediatype: action.payload.mediaType as any,
               media: String(action.payload.mediaUrl || ""),
               caption: String(action.payload.caption || ""),
@@ -286,6 +373,11 @@ export class ContactsService {
               delay: Number(action.payload.delaySeconds || 1),
               instanceName,
             });
+            if (!sendRes.success) {
+              const errMsg = `Falha ao enviar mídia para ${contact.name} (${cleanPhone}): ${sendRes.error}`;
+              console.error("[ContactsService]", errMsg);
+              errors.push(errMsg);
+            }
           }
         }
 
@@ -375,56 +467,91 @@ export class ContactsService {
       executions = allStates;
     }
 
-    // 2. Fetch message history from Evolution API
+    // 2. Fetch message history from Evolution API querying both remoteJid and remoteJidAlt
     let messages: any[] = [];
     try {
       const config = await channelRepository.getConfig();
       const cleanBaseUrl = config.baseUrl.trim().replace(/\/+$/, "");
       const instanceName = contact.instance_name || config.selectedInstanceName || "Carlos1";
-      const remoteJid = `${contact.phone}@s.whatsapp.net`;
+      const cleanPhone = contact.phone.replace(/\D/g, "");
+      const jid = `${cleanPhone}@s.whatsapp.net`;
 
-      const response = await fetch(`${cleanBaseUrl}/chat/findMessages/${encodeURIComponent(instanceName)}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: config.apiKey.trim(),
-        },
-        body: JSON.stringify({
-          where: {
-            key: {
-              remoteJid,
-            },
+      const [resJid, resAlt] = await Promise.all([
+        fetch(`${cleanBaseUrl}/chat/findMessages/${encodeURIComponent(instanceName)}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: config.apiKey.trim(),
           },
+          body: JSON.stringify({
+            where: { key: { remoteJid: jid } },
+          }),
         }),
+        fetch(`${cleanBaseUrl}/chat/findMessages/${encodeURIComponent(instanceName)}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: config.apiKey.trim(),
+          },
+          body: JSON.stringify({
+            where: { key: { remoteJidAlt: jid } },
+          }),
+        }),
+      ]);
+
+      const rawRecords: any[] = [];
+      if (resJid.ok) {
+        const j = await resJid.json();
+        const recs = j?.messages?.records || (Array.isArray(j) ? j : []);
+        rawRecords.push(...recs);
+      }
+      if (resAlt.ok) {
+        const j = await resAlt.json();
+        const recs = j?.messages?.records || (Array.isArray(j) ? j : []);
+        rawRecords.push(...recs);
+      }
+
+      // Deduplicate by message key id
+      const seenIds = new Set<string>();
+      const uniqueRecords: any[] = [];
+      for (const rec of rawRecords) {
+        const msgId = rec?.key?.id || rec?.id;
+        if (msgId && !seenIds.has(msgId)) {
+          seenIds.add(msgId);
+          uniqueRecords.push(rec);
+        }
+      }
+
+      // Sort chronologically (oldest to newest)
+      uniqueRecords.sort((a, b) => {
+        const tA = (a.messageTimestamp || 0) * 1000 || new Date(a.createdAt || 0).getTime();
+        const tB = (b.messageTimestamp || 0) * 1000 || new Date(b.createdAt || 0).getTime();
+        return tA - tB;
       });
 
-      if (response.ok) {
-        const json = await response.json();
-        const records = json?.messages?.records || (Array.isArray(json) ? json : []);
-        messages = records.map((m: any) => {
-          const msgObj = m.message || {};
-          const text =
-            msgObj.conversation ||
-            msgObj.extendedTextMessage?.text ||
-            msgObj.imageMessage?.caption ||
-            msgObj.videoMessage?.caption ||
-            msgObj.documentMessage?.caption ||
-            (m.messageType === "audioMessage" ? "Mensagem de voz (Áudio)" : "") ||
-            (m.messageType === "imageMessage" ? "Imagem recebida" : "") ||
-            (m.messageType === "documentMessage" ? "Documento anexo" : "") ||
-            "";
+      messages = uniqueRecords.map((m: any) => {
+        const msgObj = m.message || {};
+        const text =
+          msgObj.conversation ||
+          msgObj.extendedTextMessage?.text ||
+          msgObj.imageMessage?.caption ||
+          msgObj.videoMessage?.caption ||
+          msgObj.documentMessage?.caption ||
+          (m.messageType === "audioMessage" ? "🎵 Mensagem de áudio" : "") ||
+          (m.messageType === "imageMessage" ? "📷 Imagem recebida" : "") ||
+          (m.messageType === "documentMessage" ? "📄 Documento anexo" : "") ||
+          "";
 
-          return {
-            id: m.key?.id || m.id,
-            fromMe: Boolean(m.key?.fromMe),
-            text,
-            messageType: m.messageType,
-            timestamp: m.messageTimestamp
-              ? new Date(m.messageTimestamp * 1000).toISOString()
-              : m.createdAt || new Date().toISOString(),
-          };
-        });
-      }
+        return {
+          id: m.key?.id || m.id,
+          fromMe: Boolean(m.key?.fromMe),
+          text,
+          messageType: m.messageType,
+          timestamp: m.messageTimestamp
+            ? new Date(m.messageTimestamp * 1000).toISOString()
+            : m.createdAt || new Date().toISOString(),
+        };
+      });
     } catch (err: any) {
       console.warn("[ContactsService] Error fetching WhatsApp messages history:", err.message);
     }
