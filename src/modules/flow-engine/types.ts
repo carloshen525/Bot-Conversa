@@ -29,13 +29,16 @@ export interface ConversationStateRecord {
   execution_context: {
     last_message_received?: string;
     waiting_for_input_at_node?: string;
+    canceled_reason?: string;
     history?: {
       node_id: string;
       node_type: string;
       timestamp: string;
     }[];
+    [key: string]: any;
   };
   last_interaction_at: string;
+  created_at?: string;
 }
 
 export interface EngineTriggerEvent {

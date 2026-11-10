@@ -61,6 +61,12 @@ export class ExecutionRepository {
     return this.states.get(id) || null;
   }
 
+  public async listStatesByContact(contactId: string): Promise<ConversationStateRecord[]> {
+    return Array.from(this.states.values())
+      .filter((s) => s.contact_id === contactId)
+      .sort((a, b) => new Date(b.last_interaction_at).getTime() - new Date(a.last_interaction_at).getTime());
+  }
+
   /**
    * Creates a brand new conversation state bound to an IMMUTABLE PUBLISHED SNAPSHOT (chatbot_version_id)
    */

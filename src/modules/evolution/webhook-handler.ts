@@ -3,6 +3,7 @@ import { EvolutionApiClient } from "./client";
 import { FlowEngine } from "../flow-engine/FlowEngine";
 import { ContactData, EngineTriggerEvent } from "../flow-engine/types";
 import { contactRepository } from "../database/repositories/contact.repository";
+import { contactsRepository } from "../contacts/contacts.repository";
 import { chatbotRepository } from "../database/repositories/chatbot.repository";
 import { executionRepository } from "../database/repositories/execution.repository";
 import { logRepository } from "../database/repositories/log.repository";
@@ -37,6 +38,7 @@ export class EvolutionWebhookHandler {
     }
 
     // Extract message item supporting varying payload topologies (flat, nested, array)
+    const webhookInstance = event.instance?.trim();
     const dataObj = Array.isArray(event.data) ? event.data[0] : event.data;
     const actualData = dataObj?.key ? dataObj : dataObj?.data || dataObj;
     const key = actualData?.key;
@@ -69,6 +71,17 @@ export class EvolutionWebhookHandler {
 
     // 1. Get or create Contact
     const contactRecord = await contactRepository.getOrCreate(phone, pushName);
+    
+    // Also keep modern contactsRepository in sync with latest message and interaction time
+    await contactsRepository.upsert({
+      phone,
+      name: pushName || undefined,
+      last_message: messageText || undefined,
+      last_message_at: new Date().toISOString(),
+      last_message_from_me: false,
+      instance_name: webhookInstance,
+    });
+
     const contactData: ContactData = {
       id: contactRecord.id,
       name: contactRecord.name,
@@ -179,7 +192,6 @@ export class EvolutionWebhookHandler {
     );
 
     // 5. Dispatch actions
-    const webhookInstance = event.instance?.trim();
     for (const action of result.dispatchedActions) {
       if (action.type === "send_text_message") {
         const sendRes = await this.evolutionClient.sendTextMessage({
@@ -226,6 +238,25 @@ export class EvolutionWebhookHandler {
     // 6. Persist updated contact tags and variables
     await contactRepository.updateTags(contactRecord.id, result.tags);
     await contactRepository.updateVariables(contactRecord.id, result.variables);
+
+    const modernContact = await contactsRepository.findByPhone(phone);
+    if (modernContact) {
+      await contactsRepository.updateTags(modernContact.id, result.tags);
+      await contactsRepository.updateVariables(modernContact.id, result.variables);
+      if (result.finalStatus === "completed" || result.finalStatus === "failed") {
+        await contactsRepository.updateActiveFlow(modernContact.id, undefined);
+      } else {
+        const botRecord = await chatbotRepository.findById(publishedVersion.chatbot_id);
+        await contactsRepository.updateActiveFlow(modernContact.id, {
+          chatbot_id: publishedVersion.chatbot_id,
+          chatbot_name: botRecord?.name || "Chatbot",
+          version_id: publishedVersion.id,
+          current_node_id: result.currentNodeId || undefined,
+          status: result.finalStatus as any,
+          started_at: state.last_interaction_at || new Date().toISOString(),
+        });
+      }
+    }
 
     // 7. Update conversation state
     await executionRepository.updateState(state.id, {
