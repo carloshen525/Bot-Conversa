@@ -179,12 +179,14 @@ export class EvolutionWebhookHandler {
     );
 
     // 5. Dispatch actions
+    const webhookInstance = event.instance?.trim();
     for (const action of result.dispatchedActions) {
       if (action.type === "send_text_message") {
         const sendRes = await this.evolutionClient.sendTextMessage({
           number: phone,
           text: String(action.payload.text || ""),
           delay: Number(action.payload.delaySeconds || 1),
+          instanceName: webhookInstance,
         });
         if (!sendRes.success) {
           await logRepository.insert({
@@ -205,6 +207,7 @@ export class EvolutionWebhookHandler {
           caption: String(action.payload.caption || ""),
           fileName: String(action.payload.fileName || ""),
           delay: Number(action.payload.delaySeconds || 1),
+          instanceName: webhookInstance,
         });
         if (!sendRes.success) {
           await logRepository.insert({

@@ -22,6 +22,7 @@ export class EvolutionApiClient {
       number: this.cleanPhoneNumber(params.number),
       text: params.text,
       delay: params.delay,
+      instanceName: params.instanceName,
     });
     return { success: result.success, data: result.data, error: result.error };
   }
@@ -36,6 +37,7 @@ export class EvolutionApiClient {
       caption: params.caption,
       fileName: params.fileName,
       delay: params.delay,
+      instanceName: params.instanceName,
     });
     return { success: result.success, data: result.data, error: result.error };
   }

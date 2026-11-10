@@ -142,14 +142,19 @@ export class ChannelRepository {
   }
 
   public async getActiveInstance(): Promise<InstanceInfo | null> {
-    if (!this.config.selectedInstanceName) {
-      return this.config.instances.find((i) => i.isDefault) || this.config.instances[0] || null;
+    const selected = this.config.selectedInstanceName;
+    if (selected) {
+      const match = this.config.instances.find((i) => i.name === selected);
+      if (match) return match;
+      return {
+        id: `inst_${selected}`,
+        name: selected,
+        status: "open",
+        updatedAt: new Date().toISOString(),
+        isDefault: true,
+      };
     }
-    return (
-      this.config.instances.find((i) => i.name === this.config.selectedInstanceName) ||
-      this.config.instances[0] ||
-      null
-    );
+    return this.config.instances.find((i) => i.isDefault) || this.config.instances[0] || null;
   }
 
   public async updateInstanceWebhook(

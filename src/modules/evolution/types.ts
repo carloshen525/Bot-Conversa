@@ -8,6 +8,7 @@ export interface SendTextMessageParams {
   number: string;
   text: string;
   delay?: number;
+  instanceName?: string;
 }
 
 export interface SendMediaMessageParams {
@@ -17,6 +18,7 @@ export interface SendMediaMessageParams {
   caption?: string;
   fileName?: string;
   delay?: number;
+  instanceName?: string;
 }
 
 export interface EvolutionWebhookEvent {
